@@ -2,7 +2,7 @@ import shutil
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from config import Config
-from json_config import read_json_data, write_json_data
+from json_config import move_images_to_new_folder, read_json_data, write_json_data
 from pattern_detection import find_similar_patterns, find_pattern_segments, is_golden_cross, is_bullish_arrangement
 from yolo_utils import is_bullish_arrangement as yolo_is_bullish_arrangement
 from utils import calculate_ma, get_exchange_index, get_index_ma_values, get_stock_data
@@ -711,6 +711,7 @@ def add_mode():
         data.append(new_mode)
         # 写入文件
         write_json_data(data)
+        move_images_to_new_folder(new_mode['index'])
         return jsonify({
             'success': True,
             'message': '新增成功',

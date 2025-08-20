@@ -1,74 +1,124 @@
 [
-    {
-        "index": "self_mode_1",
-        "name": "自定义模式1",
-        "lines": ["MA4", "MA8", "MA12", "MA16", "MA20", "MA47"],
-        "modeFolder": "self_mode_1",
-        "selectedFactor": null,
-        "selectedFactor2": null,
-        "photoOption": [],
-        "savedBrushTimeRanges": [
-            {
-                "code": "000021",
-                "startDate": "2025-01-17",
-                "endDate": "2025-03-05",
-                "saveTime": 1754902645071
-            }
-        ],
-        "recentNDaysValue": "近20天"
-    },
-    {
-        "index": "self_mode_2",
-        "name": "自定义模式2",
-        "lines": ["MA4", "MA8", "MA12", "MA16", "MA20", "MA47"],
-        "modeFolder": "self_mode_2",
-        "selectedFactor": null,
-        "selectedFactor2": null,
-        "photoOption": [],
-        "savedBrushTimeRanges": [
-            {
-                "code": "000021",
-                "startDate": "2025-01-16",
-                "endDate": "2025-03-05",
-                "saveTime": 1754902744242
-            },
-            {
-                "code": "000021",
-                "startDate": "2025-01-07",
-                "endDate": "2025-02-27",
-                "saveTime": 1754902756597
-            }
-        ],
-        "recentNDaysValue": "近30天"
-    },
-    {
-        "index": "self_mode_3",
-        "name": "自定义模式3",
-        "lines": ["MA4", "MA8", "MA12", "MA16", "MA20", "MA47"],
-        "modeFolder": "self_mode_3",
-        "selectedFactor": null,
-        "selectedFactor2": null,
-        "photoOption": [],
-        "savedBrushTimeRanges": [
-            {
-                "code": "000021",
-                "startDate": "2023-05-12",
-                "endDate": "2023-05-29",
-                "saveTime": 1754962444771
-            },
-            {
-                "code": "000021",
-                "startDate": "2022-07-15",
-                "endDate": "2022-08-08",
-                "saveTime": 1754962469512
-            },
-            {
-                "code": "000021",
-                "startDate": "2024-09-23",
-                "endDate": "2024-10-22",
-                "saveTime": 1754962496756
-            }
-        ],
-        "recentNDaysValue": "近40天"
-    }
+  {
+    "index": "self_mode_1",
+    "name": "自定义模式1",
+    "lines": [
+      "MA4",
+      "MA8",
+      "MA12",
+      "MA16",
+      "MA20",
+      "MA47"
+    ],
+    "modeFolder": "self_mode_1",
+    "selectedFactor": null,
+    "selectedFactor2": null,
+    "photoOption": [],
+    "savedBrushTimeRanges": [
+      {
+        "code": "000021",
+        "startDate": "2025-01-17",
+        "endDate": "2025-03-05",
+        "saveTime": 1754902645071
+      }
+    ],
+    "recentNDaysValue": "近20天"
+  },
+  {
+    "index": "self_mode_2",
+    "name": "自定义模式2",
+    "lines": [
+      "MA4",
+      "MA8",
+      "MA12",
+      "MA16",
+      "MA20",
+      "MA47"
+    ],
+    "modeFolder": "self_mode_2",
+    "selectedFactor": null,
+    "selectedFactor2": null,
+    "photoOption": [],
+    "savedBrushTimeRanges": [
+      {
+        "code": "000021",
+        "startDate": "2025-01-16",
+        "endDate": "2025-03-05",
+        "saveTime": 1754902744242
+      },
+      {
+        "code": "000021",
+        "startDate": "2025-01-07",
+        "endDate": "2025-02-27",
+        "saveTime": 1754902756597
+      }
+    ],
+    "recentNDaysValue": "近30天"
+  },
+  {
+    "index": "self_mode_3",
+    "name": "自定义模式3",
+    "lines": [
+      "MA4",
+      "MA8",
+      "MA12",
+      "MA16",
+      "MA20",
+      "MA47"
+    ],
+    "modeFolder": "self_mode_3",
+    "selectedFactor": null,
+    "selectedFactor2": null,
+    "photoOption": [],
+    "savedBrushTimeRanges": [
+      {
+        "code": "000021",
+        "startDate": "2023-05-12",
+        "endDate": "2023-05-29",
+        "saveTime": 1754962444771
+      },
+      {
+        "code": "000021",
+        "startDate": "2022-07-15",
+        "endDate": "2022-08-08",
+        "saveTime": 1754962469512
+      },
+      {
+        "code": "000021",
+        "startDate": "2024-09-23",
+        "endDate": "2024-10-22",
+        "saveTime": 1754962496756
+      }
+    ],
+    "recentNDaysValue": "近40天"
+  },
+  {
+    "index": "new_self_mode_1",
+    "name": "new_self_mode_1",
+    "lines": [
+      "MA4",
+      "MA8",
+      "MA12",
+      "MA16",
+      "MA20",
+      "MA47"
+    ],
+    "modeFolder": "new_self_mode_1",
+    "selectedFactor": null,
+    "savedBrushTimeRanges": [
+      {
+        "code": "000021",
+        "startDate": "2024-11-20",
+        "endDate": "2024-12-19",
+        "saveTime": 1755679842241
+      },
+      {
+        "code": "000021",
+        "startDate": "2024-06-20",
+        "endDate": "2024-08-28",
+        "saveTime": 1755679850763
+      }
+    ],
+    "recentNDaysValue": "近20天"
+  }
 ]
