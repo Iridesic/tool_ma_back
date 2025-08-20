@@ -92,9 +92,7 @@ def get_stock_data_from_csv(code, start_date=None, end_date=None, data_folder=No
         return pd.DataFrame(), ""
 
 def find_similar_stocks(target_code, target_start_date, target_end_date, 
-                       stock_data_dict, n_days, ma_list,
-                       group_weights=None, single_ma_weights=None,
-                       crossover_weights=None):
+                       stock_data_dict, n_days, ma_list):
     """找到与目标股票指定时间段数据相似的股票"""
     if target_code.endswith(('.SH', '.SZ')):
         target_code = target_code[:-3]
@@ -169,12 +167,7 @@ def find_similar_stocks(target_code, target_start_date, target_end_date,
         try:
             ma_group = {f'MA{period}': data[f'MA{period}'].values for period in ma_list}
             # 计算相似度时会自动处理长度不匹配
-            similarity = calculate_ma_group_similarity(
-                target_ma_group, ma_group, ma_list,
-                group_weights=group_weights, 
-                single_ma_weights=single_ma_weights,
-                crossover_weights=crossover_weights
-            )
+            similarity = calculate_ma_group_similarity(target_ma_group, ma_group, ma_list)
             # 获取股票名称，若无则使用代码
             stock_name = stock_names.get(code, code)
             similarity_results.append((code, stock_name, similarity['overall_similarity']))
@@ -208,34 +201,15 @@ def identify_crossovers(ma_short, ma_long):
     
     return golden_cross, death_cross
 
-def calculate_crossover_similarity(ma_group1, ma_group2, ma_periods, crossover_weights=None):
-    """计算交叉模式相似度，自动处理长度不匹配，支持金叉死叉特征自定义权重"""
-    # 设置交叉特征默认权重
-    if crossover_weights is None:
-        crossover_weights = {
-            'golden_count': 0.25,    # 金叉频率权重
-            'golden_position': 0.25, # 金叉位置权重
-            'death_count': 0.25,     # 死叉频率权重
-            'death_position': 0.25   # 死叉位置权重
-        }
-    
-    # 验证权重是否有效
-    weight_sum = sum(crossover_weights.values())
-    if not np.isclose(weight_sum, 1.0):
-        # 权重之和不为1时进行归一化
-        print(f"交叉特征权重之和为{weight_sum}，自动归一化处理")
-        for key in crossover_weights:
-            crossover_weights[key] /= weight_sum
-    
+def calculate_crossover_similarity(ma_group1, ma_group2, ma_periods):
+    """计算交叉模式相似度，自动处理长度不匹配"""
     cross_pairs = []
     for i in range(len(ma_periods)):
         for j in range(i+1, len(ma_periods)):
             cross_pairs.append((ma_periods[i], ma_periods[j]))
     
-    total_golden_count = 0
-    total_golden_position = 0
-    total_death_count = 0
-    total_death_position = 0
+    total_golden_similarity = 0
+    total_death_similarity = 0
     cross_count = len(cross_pairs)
     
     for short_period, long_period in cross_pairs:
@@ -249,14 +223,14 @@ def calculate_crossover_similarity(ma_group1, ma_group2, ma_periods, crossover_w
         g1_golden, g1_death = identify_crossovers(ma1_short, ma1_long)
         g2_golden, g2_death = identify_crossovers(ma2_short, ma2_long)
         
-        # 计算交叉点数量相似度（频率）
+        # 计算交叉点数量相似度
         count_golden1, count_golden2 = len(g1_golden), len(g2_golden)
         count_death1, count_death2 = len(g1_death), len(g2_death)
         
         golden_count_sim = 1 - abs(count_golden1 - count_golden2) / (max(count_golden1, count_golden2, 1) + 1e-10)
         death_count_sim = 1 - abs(count_death1 - count_death2) / (max(count_death1, count_death2, 1) + 1e-10)
         
-        # 计算交叉点位置相似度
+        # 计算交叉点位置相似度（增加短序列处理）
         def calculate_position_similarity(pos1, pos2, max_length):
             if len(pos1) == 0 or len(pos2) == 0:
                 return 1.0 if len(pos1) == len(pos2) else 0.0
@@ -282,33 +256,21 @@ def calculate_crossover_similarity(ma_group1, ma_group2, ma_periods, crossover_w
         golden_pos_sim = calculate_position_similarity(g1_golden, g2_golden, len(ma1_short))
         death_pos_sim = calculate_position_similarity(g1_death, g2_death, len(ma1_short))
         
-        # 累加各特征相似度
-        total_golden_count += golden_count_sim
-        total_golden_position += golden_pos_sim
-        total_death_count += death_count_sim
-        total_death_position += death_pos_sim
+        # 综合交叉点相似度
+        golden_sim = (golden_count_sim + golden_pos_sim) / 2
+        death_sim = (death_count_sim + death_pos_sim) / 2
+        
+        total_golden_similarity += golden_sim
+        total_death_similarity += death_sim
     
-    # 计算各特征的平均相似度
-    avg_golden_count = total_golden_count / cross_count if cross_count > 0 else 0
-    avg_golden_position = total_golden_position / cross_count if cross_count > 0 else 0
-    avg_death_count = total_death_count / cross_count if cross_count > 0 else 0
-    avg_death_position = total_death_position / cross_count if cross_count > 0 else 0
-    
-    # 根据自定义权重计算交叉特征整体相似度
-    overall_crossover_similarity = (
-        avg_golden_count * crossover_weights['golden_count'] +
-        avg_golden_position * crossover_weights['golden_position'] +
-        avg_death_count * crossover_weights['death_count'] +
-        avg_death_position * crossover_weights['death_position']
-    )
+    avg_golden_similarity = total_golden_similarity / cross_count if cross_count > 0 else 0
+    avg_death_similarity = total_death_similarity / cross_count if cross_count > 0 else 0
+    overall_crossover_similarity = (avg_golden_similarity + avg_death_similarity) / 2
     
     return {
-        'golden_count_similarity': avg_golden_count,
-        'golden_position_similarity': avg_golden_position,
-        'death_count_similarity': avg_death_count,
-        'death_position_similarity': avg_death_position,
-        'overall_crossover_similarity': overall_crossover_similarity,
-        'crossover_weights_used': crossover_weights  # 返回实际使用的权重（可能经过归一化）
+        'golden_cross_similarity': avg_golden_similarity,
+        'death_cross_similarity': avg_death_similarity,
+        'overall_crossover_similarity': overall_crossover_similarity
     }
 
 def calculate_single_ma_similarity(series1, series2):
@@ -388,10 +350,8 @@ def calculate_single_ma_similarity(series1, series2):
         'mean_level_similarity': mean_similarity
     }
 
-def calculate_ma_group_similarity(ma_group1, ma_group2, ma_periods=None,
-                                 group_weights=None, single_ma_weights=None,
-                                 crossover_weights=None):
-    """综合评估均线组相似度，自动处理长度不匹配，支持交叉特征自定义权重"""
+def calculate_ma_group_similarity(ma_group1, ma_group2, ma_periods=None, weights=None):
+    """综合评估均线组相似度，自动处理长度不匹配"""
     if ma_periods is None:
         ma_periods = [4, 8, 12, 16, 20, 47]
     
@@ -401,42 +361,18 @@ def calculate_ma_group_similarity(ma_group1, ma_group2, ma_periods=None,
         if ma_key not in ma_group1 or ma_key not in ma_group2:
             raise ValueError(f"两组均线都必须包含 {ma_key}")
     
-    # 默认权重 - 组间权重
-    if group_weights is None:
-        group_weights = {
+    # 默认权重
+    if weights is None:
+        weights = {
             'single_ma_features': 0.6,
             'crossover_features': 0.4
         }
     
-    # 验证组间权重
-    group_weight_sum = sum(group_weights.values())
-    if not np.isclose(group_weight_sum, 1.0):
-        print(f"组间权重之和为{group_weight_sum}，自动归一化处理")
-        for key in group_weights:
-            group_weights[key] /= group_weight_sum
-    
-    # 默认权重 - 单均线特征权重
-    if single_ma_weights is None:
-        single_ma_weights = {
-            'trend_direction_agreement': 0.15,
-            'trend_strength_similarity': 0.1,
-            'volatility_similarity': 0.15,
-            'pearson_similarity': 0.2,
-            'spearman_similarity': 0.15,
-            'dtw_similarity': 0.15,
-            'mean_level_similarity': 0.1
-        }
-    
-    # 验证单均线权重
-    single_ma_weight_sum = sum(single_ma_weights.values())
-    if not np.isclose(single_ma_weight_sum, 1.0):
-        print(f"单均线特征权重之和为{single_ma_weight_sum}，自动归一化处理")
-        for key in single_ma_weights:
-            single_ma_weights[key] /= single_ma_weight_sum
-    
     # 计算每条均线的相似性并取平均
     single_ma_metrics = {}
-    for metric in single_ma_weights.keys():
+    for metric in ['trend_direction_agreement', 'trend_strength_similarity', 
+                   'volatility_similarity', 'pearson_similarity', 
+                   'spearman_similarity', 'dtw_similarity', 'mean_level_similarity']:
         single_ma_metrics[metric] = 0.0
     
     for period in ma_periods:
@@ -449,27 +385,32 @@ def calculate_ma_group_similarity(ma_group1, ma_group2, ma_periods=None,
             single_ma_metrics[metric] += value / len(ma_periods)
     
     # 计算交叉模式相似度（内部已处理长度统一）
-    crossover_metrics = calculate_crossover_similarity(
-        ma_group1, ma_group2, ma_periods, 
-        crossover_weights=crossover_weights
-    )
+    crossover_metrics = calculate_crossover_similarity(ma_group1, ma_group2, ma_periods)
     
     # 计算单条均线特征的综合相似度
+    single_ma_weights = {
+        'trend_direction_agreement': 0.15,
+        'trend_strength_similarity': 0.1,
+        'volatility_similarity': 0.15,
+        'pearson_similarity': 0.2,
+        'spearman_similarity': 0.15,
+        'dtw_similarity': 0.15,
+        'mean_level_similarity': 0.1
+    }
+    
     single_ma_overall = 0.0
     for metric, weight in single_ma_weights.items():
         single_ma_overall += single_ma_metrics[metric] * weight
     
     # 计算总体综合相似度
     overall_similarity = (
-        single_ma_overall * group_weights['single_ma_features'] +
-        crossover_metrics['overall_crossover_similarity'] * group_weights['crossover_features']
+        single_ma_overall * weights['single_ma_features'] +
+        crossover_metrics['overall_crossover_similarity'] * weights['crossover_features']
     )
     
     return {**single_ma_metrics,** crossover_metrics,
               'single_ma_overall': single_ma_overall,
-              'overall_similarity': overall_similarity,
-              'group_weights_used': group_weights,
-              'single_ma_weights_used': single_ma_weights}
+              'overall_similarity': overall_similarity}
 
 
 # 使用前端传来的stock_pool股票池数据进行候选查找
@@ -588,31 +529,6 @@ if __name__ == "__main__":
     n_days = 20
     ma_list = [4, 8, 12, 16, 20, 47]
     
-    # 默认权重配置 ################################################
-    default_group_weights = {
-        'single_ma_features': 0.6,
-        'crossover_features': 0.4
-    }
-    
-    default_single_ma_weights = {
-        'trend_direction_agreement': 0.15, 
-        'trend_strength_similarity': 0.1,
-        'volatility_similarity': 0.15,
-        'pearson_similarity': 0.2,
-        'spearman_similarity': 0.15,
-        'dtw_similarity': 0.15,
-        'mean_level_similarity': 0.1
-    }
-    
-    # 新增：交叉特征默认权重（金叉、死叉的位置和频率）
-    default_crossover_weights = {
-        'golden_count': 0.25,    # 金叉频率权重
-        'golden_position': 0.25, # 金叉位置权重
-        'death_count': 0.25,     # 死叉频率权重
-        'death_position': 0.25   # 死叉位置权重
-    }
-    ##############################################################
-
     print("正在提取股票池数据...")
     stock_data_dict = extract_stock_data_from_folder(data_folder, n_days, ma_list)
     
@@ -634,10 +550,7 @@ if __name__ == "__main__":
     print("正在计算相似度，请稍候...")
     similar_stocks = find_similar_stocks(
         target_code, target_start_date, target_end_date,
-        stock_data_dict, n_days, ma_list,
-        group_weights=default_group_weights,
-        single_ma_weights=default_single_ma_weights,
-        crossover_weights=default_crossover_weights  # 传入交叉特征权重
+        stock_data_dict, n_days, ma_list
     )
     
     if similar_stocks:

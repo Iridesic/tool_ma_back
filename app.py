@@ -2,6 +2,7 @@ import shutil
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from config import Config
+from json_config import read_json_data, write_json_data
 from pattern_detection import find_similar_patterns, find_pattern_segments, is_golden_cross, is_bullish_arrangement
 from yolo_utils import is_bullish_arrangement as yolo_is_bullish_arrangement
 from utils import calculate_ma, get_exchange_index, get_index_ma_values, get_stock_data
@@ -9,7 +10,7 @@ from datetime import datetime, timedelta
 import os
 from datetime import datetime
 # 首先添加必要的导入
-from deal_sim_time_range import find_similar_stocks, extract_stock_data_from_folder
+from deal_sim_time_range import find_similar_stocks, extract_stock_data_from_folder, get_candidate_stocks
 import pandas as pd
 
 
@@ -567,13 +568,19 @@ def handle_find_similar_stocks_new():
         target_code = data.get('target_code', '')
         start_date = data.get('start_date', '')
         end_date = data.get('end_date', '')
+        stock_pool = data.get('stock_pool', [])
         n_days = data.get('n_days', 20)  # 默认20天
         # 传过来的n_days是字符串'近20天'的形式，将它转换成数字，采用提取指定位置字符的方式
         n_days = n_days[1:-1]
         # 把n_days转换为整数
         n_days = int(n_days) if isinstance(n_days, (int, float, str)) and str(n_days).isdigit() else 20
         ma_list = data.get('ma_list', [4, 8, 12, 16, 20, 47])  # 默认均线列表
+        group_weights = data.get('group_weights', None)
+        single_ma_weights = data.get('single_ma_weights', None)
+        crossover_weights = data.get('crossover_weights', None)
+
         data_folder = data.get('data_folder', r'D:\self\data\kline-data')  # 默认数据文件夹
+
         
         # 验证必要参数
         if not target_code or not start_date or not end_date:
@@ -588,8 +595,11 @@ def handle_find_similar_stocks_new():
         
         # 提取股票池数据（包含股票名称信息）
         print(f"正在提取股票池数据...")
-        stock_data_dict = extract_stock_data_from_folder(data_folder, n_days, ma_list)
-        
+        if(len(stock_pool) == 0):
+            stock_data_dict = extract_stock_data_from_folder(data_folder, n_days, ma_list)
+        else:
+            stock_data_dict = get_candidate_stocks(stock_pool, data_folder, n_days, ma_list)
+
         if not stock_data_dict or len(stock_data_dict) <= 1:
             return jsonify({"error": "未提取到任何有效股票数据"}), 500
         
@@ -597,7 +607,8 @@ def handle_find_similar_stocks_new():
         print(f"正在计算与 {target_code} 相似的股票...")
         similar_stocks = find_similar_stocks(
             target_code, start_date, end_date,
-            stock_data_dict, n_days, ma_list
+            stock_data_dict, n_days, ma_list,
+            group_weights=group_weights, single_ma_weights=single_ma_weights, crossover_weights=crossover_weights
         )
         
         if not similar_stocks:
@@ -646,6 +657,70 @@ def handle_find_similar_stocks_new():
     except Exception as e:
         print(f"处理相似股票查找请求时出错: {str(e)}")
         return jsonify({"error": f"服务器错误: {str(e)}"}), 500
+
+# json config ##############################################
+CORS(app, resources={r"/get_modeListSelf_new": {
+    "origins": Config.CORS_ORIGINS,
+    "methods": ["POST", "OPTIONS"],
+    "allow_headers": ["Content-Type"],
+    "supports_credentials": True
+}})
+@app.route('/get_modeListSelf_new', methods=['GET'])
+def get_mode_list():
+    """获取所有模式列表"""
+    data = read_json_data()
+    return jsonify({
+        'success': True,
+        'data': data
+    })
+
+CORS(app, resources={r"/add_modeListSelf_new": {
+    "origins": Config.CORS_ORIGINS,
+    "methods": ["POST", "OPTIONS"],
+    "allow_headers": ["Content-Type"],
+    "supports_credentials": True
+}})
+@app.route('/add_modeListSelf_new', methods=['POST'])
+def add_mode():
+    """新增模式到JSON文件"""
+    try:
+        # 获取前端发送的新数据
+        new_mode = request.get_json()
+        
+        # 验证必要字段
+        required_fields = ['index', 'name']
+        for field in required_fields:
+            if field not in new_mode:
+                return jsonify({
+                    'success': False,
+                    'message': f'缺少必要字段: {field}'
+                }), 400
+        
+        # 读取现有数据
+        data = read_json_data()
+        
+        # 检查index是否已存在
+        for item in data:
+            if item['index'] == new_mode['index']:
+                return jsonify({
+                    'success': False,
+                    'message': f'index已存在: {new_mode["index"]}'
+                }), 400
+        
+        # 添加新数据
+        data.append(new_mode)
+        # 写入文件
+        write_json_data(data)
+        return jsonify({
+            'success': True,
+            'message': '新增成功',
+            'data': new_mode
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'服务器错误: {str(e)}'
+        }), 500
 
 if __name__ == "__main__":
     app.run(debug=Config.DEBUG)
