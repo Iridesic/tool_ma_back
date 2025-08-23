@@ -225,19 +225,19 @@ def detect_bullish_arrangement():
     extend_days = data.get('extend_days', 3)
     window_size = data.get('window_size', 21)  # 窗口大小
     step_size = data.get('step_size', 21)      # 步长大小
-    
+    data_folder = data.get('data_folder', r'D:\self\data\kline-data')  # 默认数据文件夹
     result = {}
     for stock in stock_pool:
         ts_code = f"{stock['code']}.SH" if stock['code'].startswith('6') else f"{stock['code']}.SZ"
         # 获取股票数据
-        df = get_stock_data(ts_code, start_date, end_date) 
+        df = get_stock_data(ts_code, start_date, end_date, data_folder=data_folder) 
         if df.empty:
             continue
         
         df = calculate_ma(df, ma_list)
         if df.empty:
             continue
-        
+
         # 滑动窗口检测多头排列，使用正确的步长
         pattern_intervals = []
         for i in range(0, len(df) - window_size + 1, step_size):
@@ -632,6 +632,7 @@ def handle_find_similar_stocks_new():
             
             # 转换日期格式为字符串
             stock_data_filtered['trade_date'] = stock_data_filtered['trade_date'].dt.strftime('%Y-%m-%d')
+            print("trade_date--------", stock_data_filtered['trade_date'].tolist())
             
             # 转换为字典列表
             stock_records = stock_data_filtered.to_dict('records')

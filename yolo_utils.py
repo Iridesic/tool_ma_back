@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 from config import Config
 
+plt.switch_backend('Agg')  # 添加此行，使用非GUI后端
 plt.rcParams["font.family"] = ["SimHei"]
 plt.rcParams['axes.unicode_minus'] = False
 
@@ -131,18 +132,26 @@ def is_bullish_arrangement(data_segment, ma_list, extend_days=3):
     # 生成临时均线图
     chart_dir = os.path.join(Config.OUTPUT_DIR, "charts")
     os.makedirs(chart_dir, exist_ok=True)
-    stock_code = data_segment['ts_code'].iloc[0].split('.')[0]
-    date_range = f"{data_segment['trade_date'].iloc[0]}_to_{data_segment['trade_date'].iloc[-1]}"
+    # stock_code = data_segment['code'] ###################################
+    stock_code = str(data_segment['code'].iloc[0])
+    print("code--------", stock_code)
+
+    # 修复日期格式：移除时间中的冒号
+    start_date = str(data_segment['trade_date'].iloc[0]).replace(':', '-')
+    end_date = str(data_segment['trade_date'].iloc[-1]).replace(':', '-')
+    date_range = f"{start_date}_to_{end_date}"
+    # date_range = f"{data_segment['trade_date'].iloc[0]}_to_{data_segment['trade_date'].iloc[-1]}"
     chart_path = os.path.join(chart_dir, f"{stock_code}_{date_range}_ma.png")
-    
+    print("1111")
     # 提取均线数据并生成图表
-    ma_data = data_segment[['trade_date'] + [f'MA{ma}' for ma in ma_list]]
+    ma_data = data_segment[['trade_date'] + [f'MA{ma}' for ma in ma_list]].copy()  # 添加.copy()
     ma_data['trade_date'] = pd.to_datetime(ma_data['trade_date'])
     generate_ma_chart(stock_code, ma_data, chart_path)
     
+    print("2222")
     # 执行YOLO检测
     has_detections, detection_path, yolo_results = detect_with_yolo(chart_path)
-    
+    print("3333")
     # 如果没有检测到目标，进一步检查均线数据
     if not has_detections:
         # 检查均线排列是否满足多头条件

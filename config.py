@@ -6,3 +6,4 @@ class Config:
     CORS_ORIGINS = ["http://localhost:8080"]
     MODEL_PATH = "D:/self/code/vuecode/tool_ma_front/src/models/weights/best.pt"  # 训练好的YOLO模型路径
     OUTPUT_DIR = "D:/self/code/vuecode/tool_ma_front/src/models/yolo_results"  # 检测结果保存目录
+    

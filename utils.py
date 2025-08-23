@@ -11,35 +11,85 @@ import json
 ts.set_token(Config.TUSHARE_TOKEN)
 pro = ts.pro_api()
 
-# 获取指定股票在指定时间范围内的行情数据
-def get_stock_data(ts_code, start_date, end_date):
-    # start_date = datetime.strptime(start_date.split('T')[0], '%Y-%m-%d').strftime('%Y%m%d')
-    # end_date = datetime.strptime(end_date.split('T')[0], '%Y-%m-%d').strftime('%Y%m%d')
+# # 获取指定股票在指定时间范围内的行情数据
+# def get_stock_data(ts_code, start_date, end_date):
+#     try:
+#         df = pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
+#         if df.empty:
+#             print(f"未获取到 {ts_code} 在 {start_date} 到 {end_date} 的数据。")
+#             return pd.DataFrame()
+#         df = df.sort_values('trade_date')
+#         return df
+#     except Exception as e:
+#         print(f"获取 {ts_code} 数据时出错: {e}")
+#         return pd.DataFrame()
+    
+# def get_stock_data1(ts_code, start_date, end_date):
+#     start_date = datetime.strptime(start_date.split('T')[0], '%Y-%m-%d').strftime('%Y%m%d')
+#     end_date = datetime.strptime(end_date.split('T')[0], '%Y-%m-%d').strftime('%Y%m%d')
+#     try:
+#         df = pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
+#         if df.empty:
+#             print(f"未获取到 {ts_code} 在 {start_date} 到 {end_date} 的数据。")
+#             return pd.DataFrame()
+#         df = df.sort_values('trade_date')
+#         return df
+#     except Exception as e:
+#         print(f"获取 {ts_code} 数据时出错: {e}")
+#         return pd.DataFrame()
+    
+# 替换get_stock_data和get_stock_data1为CSV读取逻辑，保留日期格式差异处理
+def get_stock_data(ts_code, start_date, end_date, data_folder="D:/self/data/kline-data"):
+    """
+    从CSV文件获取股票数据（处理YYYY-MM-DD格式日期）
+    替代原Tushare接口，兼容常规日期格式
+    """
+    # 处理ts_code格式（去掉后缀，如.SH/.SZ）
+    code = ts_code.split('.')[0] if '.' in ts_code else ts_code
+    # 调用deal_sim_time_range中的CSV读取函数
+    from deal_sim_time_range import get_stock_data_from_csv
+    df, _ = get_stock_data_from_csv(
+        code=code,
+        start_date=start_date,
+        end_date=end_date,
+        data_folder=data_folder,
+        use_full_history=False
+    )
+    # 确保返回数据格式与原Tushare接口兼容
+    return _standardize_dataframe(df)
+
+def get_stock_data1(ts_code, start_date, end_date, data_folder="D:/self/data/kline-data"):
+    """
+    从CSV文件获取股票数据（处理YYYYMMDD格式日期）
+    保留原函数名以兼容历史调用，专门处理数字型日期格式
+    """
+    # 转换日期格式为YYYY-MM-DD（适配CSV读取函数的日期参数要求）
     try:
-        df = pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
-        if df.empty:
-            print(f"未获取到 {ts_code} 在 {start_date} 到 {end_date} 的数据。")
-            return pd.DataFrame()
-        df = df.sort_values('trade_date')
-        return df
-    except Exception as e:
-        print(f"获取 {ts_code} 数据时出错: {e}")
+        # 处理YYYYMMDD格式（如20231001 -> 2023-10-01）
+        start_date = datetime.strptime(start_date, "%Y%m%d").strftime("%Y-%m-%d")
+        end_date = datetime.strptime(end_date, "%Y%m%d").strftime("%Y-%m-%d")
+    except ValueError:
+        # 格式转换失败时使用原始值，由底层函数处理错误
+        pass
+    
+    # 复用get_stock_data的核心逻辑，仅差异在于日期格式转换
+    return get_stock_data(ts_code, start_date, end_date, data_folder)
+
+def _standardize_dataframe(df):
+    """标准化DataFrame格式，确保包含必要列"""
+    if df.empty:
         return pd.DataFrame()
     
-def get_stock_data1(ts_code, start_date, end_date):
-    start_date = datetime.strptime(start_date.split('T')[0], '%Y-%m-%d').strftime('%Y%m%d')
-    end_date = datetime.strptime(end_date.split('T')[0], '%Y-%m-%d').strftime('%Y%m%d')
-    try:
-        df = pro.daily(ts_code=ts_code, start_date=start_date, end_date=end_date)
-        if df.empty:
-            print(f"未获取到 {ts_code} 在 {start_date} 到 {end_date} 的数据。")
-            return pd.DataFrame()
-        df = df.sort_values('trade_date')
-        return df
-    except Exception as e:
-        print(f"获取 {ts_code} 数据时出错: {e}")
-        return pd.DataFrame()
-    
+    # 确保包含后续处理所需的列
+    required_columns = ['timestamps', 'open', 'close', 'high', 'low', 'vol']
+    for col in required_columns:
+        if col not in df.columns:
+            df[col] = None  # 缺失列填充None
+
+    df['trade_date'] = pd.to_datetime(df['timestamps'], errors='coerce')
+    # 按交易日期排序
+    return df.sort_values('timestamps')
+###########################################
 
 # 计算相应的MA曲线值
 def calculate_ma(data, ma_list):
@@ -137,8 +187,8 @@ def get_raw_index_data_from_json(index_code):
         with open(json_file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        df = pd.DataFrame(data, columns=['trade_date', 'low', 'high', 'close', 'open', 'volume'])
-        df['trade_date'] = pd.to_datetime(df['trade_date'])
+        df = pd.DataFrame(data, columns=['timestamps', 'low', 'high', 'close', 'open', 'vol'])
+        df['trade_date'] = pd.to_datetime(df['timestamps'], errors='coerce')
         df = df.sort_values('trade_date')
         return df
     
