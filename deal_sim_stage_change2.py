@@ -255,10 +255,10 @@ def detect_bullish_arrangement(stock_pool, start_date, end_date,
                 print(f"股票 {stock_code} 均线计算失败，跳过")
                 continue
             
-            # 确保数据按时间排序，使用'trade_date'列名保持一致
-            df_with_ma = df_with_ma.sort_values('trade_date').reset_index(drop=True)
+            # 确保数据按时间排序，使用'timestamps'列名保持一致
+            df_with_ma = df_with_ma.sort_values('timestamps').reset_index(drop=True)
             # 确保日期为datetime类型以便比较
-            df_with_ma['trade_date'] = pd.to_datetime(df_with_ma['trade_date'])
+            df_with_ma['timestamps'] = pd.to_datetime(df_with_ma['timestamps'])
             # 保存原始数据用于提取均线信息
             full_data = df_with_ma.copy()
             
@@ -333,11 +333,11 @@ def detect_bullish_arrangement(stock_pool, start_date, end_date,
                         # 计算stage1持续天数
                         stage1_days = (current_stage2_start - 1) - stage1_start_idx + 1
                         
-                        # 提取日期（使用trade_date保持一致）
-                        stage1_start_date = full_data.loc[stage1_start_idx, 'trade_date']
-                        stage1_end_date = full_data.loc[current_stage2_start - 1, 'trade_date']
-                        stage2_start_date = full_data.loc[current_stage2_start, 'trade_date']
-                        stage2_end_date = full_data.loc[i-1, 'trade_date']
+                        # 提取日期（使用timestamps保持一致）
+                        stage1_start_date = full_data.loc[stage1_start_idx, 'timestamps']
+                        stage1_end_date = full_data.loc[current_stage2_start - 1, 'timestamps']
+                        stage2_start_date = full_data.loc[current_stage2_start, 'timestamps']
+                        stage2_end_date = full_data.loc[i-1, 'timestamps']
                         
                         # 检查有效性（保持与原方法相同的阈值）
                         valid_stage1 = (stage1_start_idx <= current_stage2_start - 1) and (stage1_days > 3)
@@ -356,10 +356,10 @@ def detect_bullish_arrangement(stock_pool, start_date, end_date,
                             # 使用stage1对应的阈值判断长短周期
                             duration_type = "long" if stage1_days > duration_thresholds['stage1'] else "short"
 
-                            # 筛选stage1期间的数据（使用trade_date）
-                            stage1_mask = (full_data['trade_date'] >= stage1_start_date) & \
-                                         (full_data['trade_date'] <= stage1_end_date)
-                            stage1_data = full_data.loc[stage1_mask, ['trade_date'] + [f'MA{period}' for period in ma_periods]]
+                            # 筛选stage1期间的数据（使用timestamps）
+                            stage1_mask = (full_data['timestamps'] >= stage1_start_date) & \
+                                         (full_data['timestamps'] <= stage1_end_date)
+                            stage1_data = full_data.loc[stage1_mask, ['timestamps'] + [f'MA{period}' for period in ma_periods]]
                             
                             # 转换为字典列表以便存储
                             ma_values = stage1_data.to_dict('records')
@@ -396,10 +396,10 @@ def detect_bullish_arrangement(stock_pool, start_date, end_date,
                             # 使用stage2对应的阈值判断长短周期
                             duration_type = "long" if stage2_days > duration_thresholds['stage2'] else "short"
                             
-                            # 筛选stage2期间的数据（使用trade_date）
-                            stage2_mask = (full_data['trade_date'] >= stage2_start_date) & \
-                                         (full_data['trade_date'] <= stage2_end_date)
-                            stage2_data = full_data.loc[stage2_mask, ['trade_date'] + [f'MA{period}' for period in ma_periods]]
+                            # 筛选stage2期间的数据（使用timestamps）
+                            stage2_mask = (full_data['timestamps'] >= stage2_start_date) & \
+                                         (full_data['timestamps'] <= stage2_end_date)
+                            stage2_data = full_data.loc[stage2_mask, ['timestamps'] + [f'MA{period}' for period in ma_periods]]
                             
                             # 转换为字典列表以便存储
                             ma_values = stage2_data.to_dict('records')
@@ -469,11 +469,11 @@ def detect_bullish_arrangement(stock_pool, start_date, end_date,
                 # 计算stage1持续天数
                 stage1_days = (current_stage2_start - 1) - stage1_start_idx + 1
                 
-                # 提取日期（使用trade_date保持一致）
-                stage1_start_date = full_data.loc[stage1_start_idx, 'trade_date']
-                stage1_end_date = full_data.loc[current_stage2_start - 1, 'trade_date']
-                stage2_start_date = full_data.loc[current_stage2_start, 'trade_date']
-                stage2_end_date = full_data.loc[len(full_data)-1, 'trade_date']
+                # 提取日期（使用timestamps保持一致）
+                stage1_start_date = full_data.loc[stage1_start_idx, 'timestamps']
+                stage1_end_date = full_data.loc[current_stage2_start - 1, 'timestamps']
+                stage2_start_date = full_data.loc[current_stage2_start, 'timestamps']
+                stage2_end_date = full_data.loc[len(full_data)-1, 'timestamps']
                 
                 # 检查有效性（保持与原方法相同的阈值）
                 valid_stage1 = (stage1_start_idx <= current_stage2_start - 1) and (stage1_days > 3)
@@ -489,23 +489,24 @@ def detect_bullish_arrangement(stock_pool, start_date, end_date,
                 
                 # 添加有效的stage1
                 if valid_stage1:
-                    # 筛选stage1期间的数据（使用trade_date）
-                    stage1_mask = (full_data['trade_date'] >= stage1_start_date) & \
-                                 (full_data['trade_date'] <= stage1_end_date)
-                    stage1_data = full_data.loc[stage1_mask, ['trade_date'] + [f'MA{period}' for period in ma_periods]]
+                    # 筛选stage1期间的数据（使用timestamps）
+                    stage1_mask = (full_data['timestamps'] >= stage1_start_date) & \
+                                 (full_data['timestamps'] <= stage1_end_date)
+                    stage1_data = full_data.loc[stage1_mask, ['timestamps'] + [f'MA{period}' for period in ma_periods]]
                     
                     ma_values = stage1_data.to_dict('records')
                     
                     # 提取特征用于相似度计算
                     feature_vector = extract_stage_features(stage1_data, ma_periods)
-                    
+                    duration_type_stage1 = "long" if stage1_days > duration_thresholds['stage1'] else "short"
                     # 预测stage1的多空类型
                     stage1_type, stage1_prob = predict_stage_type(
                         stock_code, 
                         stage1_start_date, 
                         stage1_end_date, 
                         'stage1',
-                        model_base_path,
+                        duration_type_stage1,
+                        duration_type,
                         data_folder
                     )
                     
@@ -522,22 +523,23 @@ def detect_bullish_arrangement(stock_pool, start_date, end_date,
                 
                 # 添加有效的stage2
                 if valid_stage2:
-                    # 筛选stage2期间的数据（使用trade_date）
-                    stage2_mask = (full_data['trade_date'] >= stage2_start_date) & \
-                                 (full_data['trade_date'] <= stage2_end_date)
-                    stage2_data = full_data.loc[stage2_mask, ['trade_date'] + [f'MA{period}' for period in ma_periods]]
+                    # 筛选stage2期间的数据（使用timestamps）
+                    stage2_mask = (full_data['timestamps'] >= stage2_start_date) & \
+                                 (full_data['timestamps'] <= stage2_end_date)
+                    stage2_data = full_data.loc[stage2_mask, ['timestamps'] + [f'MA{period}' for period in ma_periods]]
                     
                     ma_values = stage2_data.to_dict('records')
                     
                     # 提取特征用于相似度计算
                     feature_vector = extract_stage_features(stage2_data, ma_periods)
-                    
+                    duration_type_stage2 = "long" if stage2_days > duration_thresholds['stage2'] else "short"
                     # 预测stage2的多空类型
                     stage2_type, stage2_prob = predict_stage_type(
                         stock_code, 
                         stage2_start_date, 
                         stage2_end_date, 
                         'stage2',
+                        duration_type_stage2,
                         model_base_path,
                         data_folder
                     )
@@ -566,7 +568,7 @@ def detect_bullish_arrangement(stock_pool, start_date, end_date,
                 if stage3_start_idx >= len(full_data):
                     continue  # 如果已经是最后一条记录，无法形成stage3
                 
-                stage3_start_date = full_data.loc[stage3_start_idx, 'trade_date']
+                stage3_start_date = full_data.loc[stage3_start_idx, 'timestamps']
                 stage3_end_idx = None
                 
                 # 寻找stage3的结束点（严格按照原方法逻辑）
@@ -590,13 +592,13 @@ def detect_bullish_arrangement(stock_pool, start_date, end_date,
                 
                 # 如果找到结束点，则记录stage3
                 if stage3_end_idx is not None:
-                    stage3_end_date = full_data.loc[stage3_end_idx, 'trade_date']
+                    stage3_end_date = full_data.loc[stage3_end_idx, 'timestamps']
                     stage3_days = stage3_end_idx - stage3_start_idx + 1
                     
-                    # 筛选stage3期间的均线数据（使用trade_date）
-                    stage3_mask = (full_data['trade_date'] >= stage3_start_date) & \
-                                 (full_data['trade_date'] <= stage3_end_date)
-                    stage3_data = full_data.loc[stage3_mask, ['trade_date'] + [f'MA{period}' for period in ma_periods]]
+                    # 筛选stage3期间的均线数据（使用timestamps）
+                    stage3_mask = (full_data['timestamps'] >= stage3_start_date) & \
+                                 (full_data['timestamps'] <= stage3_end_date)
+                    stage3_data = full_data.loc[stage3_mask, ['timestamps'] + [f'MA{period}' for period in ma_periods]]
                     
                     ma_values = stage3_data.to_dict('records')
                     
@@ -694,7 +696,7 @@ def determine_stage(stock_code, start_date, end_date,
                 "实际找到的日期": actual_dates
             }, None
         
-        # 首先检查是否符合stage3特征（优先级最高）
+        # 4. 检查是否符合stage3特征（优先级最高）
         is_stage3 = True
         stage3_evidence = []
         ma4_col = f'MA4'
@@ -738,93 +740,72 @@ def determine_stage(stock_code, start_date, end_date,
                 stage3_evidence.append(f"在 {df_with_ma.loc[current_idx, 'timestamps'].strftime('%Y-%m-%d')} 上升均线不足4条，不符合stage3特征")
                 break
         
-        # 检查stage3是否在末尾有MA4和其他均线同时下降的情况
-        if is_stage3 and not has_ma4_and_other_dropping_at_end:
-            is_stage3 = False
-            stage3_evidence.append(f"区间末尾未出现MA4和其他均线同时下降的情况，不符合stage3特征")
-        
-        if is_stage3:
+        if is_stage3 and has_ma4_and_other_dropping_at_end:
             # 提取特征向量
             feature_vector = extract_stage_features(target_data, ma_periods)
             # 计算持续天数
-            duration_days = (original_end - original_start).days
-            # 确定周期类型
-            duration_thresholds = {'stage1': 10, 'stage2': 4, 'stage3': 10}
-            duration_type = "long" if duration_days > duration_thresholds['stage3'] else "short"
-            # 获取预测结果
-            prediction, prob = predict_stage_type(
-                stock_code, original_start, original_end, 
-                'stage3', duration_type, model_base_path, data_folder
+            duration_days = len(target_data)
+            duration_type = "long" if duration_days > 10 else "short"  # 使用stage3默认阈值
+            # 预测多空类型
+            pred_type, pred_prob = predict_stage_type(
+                stock_code, original_start, original_end, 'stage3',
+                duration_type, model_base_path, data_folder
             )
             return 'stage3', {
-                "evidence": "符合stage3特征",
                 "duration_days": duration_days,
-                "duration_type": duration_type,
-                "prediction": prediction,
-                "probability": prob
+                "prediction": pred_type,
+                "probability": pred_prob
             }, feature_vector
         
-        # 检查是否符合stage2特征（优先级次之）
+        # 5. 检查是否符合stage2特征
         is_stage2 = True
         stage2_evidence = []
-        
-        for i in range(len(target_data)):
-            # 检查均线排列顺序（短周期在上，长周期在下）
+        for i in range(1, len(target_data)):
+            current_idx = target_data.index[i]
+            prev_idx = target_data.index[i-1]
+            
+            # 检查均线排列顺序（短周期在上）
             order_valid = True
             for j in range(len(ma_periods) - 1):
                 current_ma = f'MA{ma_periods[j]}'
                 next_ma = f'MA{ma_periods[j+1]}'
-                if target_data.loc[i, current_ma] <= target_data.loc[i, next_ma]:
+                if df_with_ma.loc[current_idx, current_ma] <= df_with_ma.loc[current_idx, next_ma]:
                     order_valid = False
                     break
-            
-            # 检查所有均线是否向上（当前值 > 前一天值）
-            if i > 0:  # 第一天没有前一天数据，不检查
-                all_rising = True
-                for period in ma_periods:
-                    ma_col = f'MA{period}'
-                    if target_data.loc[i, ma_col] <= target_data.loc[i-1, ma_col]:
-                        all_rising = False
-                        break
-            else:
-                all_rising = True  # 第一天默认有效
-            
-            if not order_valid or (i > 0 and not all_rising):
+            if not order_valid:
                 is_stage2 = False
-                date_str = target_data.loc[i, 'timestamps'].strftime('%Y-%m-%d')
-                reason = []
-                if not order_valid:
-                    reason.append("均线排列顺序不符合要求")
-                if i > 0 and not all_rising:
-                    reason.append("不是所有均线都呈上升趋势")
-                stage2_evidence.append(f"在 {date_str}: {', '.join(reason)}")
+                stage2_evidence.append(f"在 {df_with_ma.loc[current_idx, 'timestamps'].strftime('%Y-%m-%d')} 均线排列顺序错误，不符合stage2特征")
+                break
+            
+            # 检查所有均线是否向上
+            all_rising = True
+            for period in ma_periods:
+                ma_col = f'MA{period}'
+                if df_with_ma.loc[current_idx, ma_col] <= df_with_ma.loc[prev_idx, ma_col]:
+                    all_rising = False
+                    break
+            if not all_rising:
+                is_stage2 = False
+                stage2_evidence.append(f"在 {df_with_ma.loc[current_idx, 'timestamps'].strftime('%Y-%m-%d')} 存在非上升均线，不符合stage2特征")
                 break
         
         if is_stage2:
-            # 提取特征向量
             feature_vector = extract_stage_features(target_data, ma_periods)
-            # 计算持续天数
-            duration_days = (original_end - original_start).days
-            # 确定周期类型
-            duration_thresholds = {'stage1': 10, 'stage2': 4, 'stage3': 10}
-            duration_type = "long" if duration_days > duration_thresholds['stage2'] else "short"
-            # 获取预测结果
-            prediction, prob = predict_stage_type(
-                stock_code, original_start, original_end, 
-                'stage2', duration_type, model_base_path, data_folder
+            duration_days = len(target_data)
+            duration_type = "long" if duration_days > 4 else "short"  # 使用stage2默认阈值
+            pred_type, pred_prob = predict_stage_type(
+                stock_code, original_start, original_end, 'stage2',
+                duration_type, model_base_path, data_folder
             )
             return 'stage2', {
-                "evidence": "符合stage2特征",
                 "duration_days": duration_days,
-                "duration_type": duration_type,
-                "prediction": prediction,
-                "probability": prob
+                "prediction": pred_type,
+                "probability": pred_prob
             }, feature_vector
         
-        # 检查是否符合stage1特征（优先级最低）
+        # 6. 检查是否符合stage1特征
         is_stage1 = True
         stage1_evidence = []
-        
         for i in range(1, len(target_data)):
             current_idx = target_data.index[i]
             prev_idx = target_data.index[i-1]
@@ -833,47 +814,39 @@ def determine_stage(stock_code, start_date, end_date,
             rising_count = 0
             for period in ma_periods:
                 ma_col = f'MA{period}'
-                if target_data.loc[i, ma_col] > target_data.loc[prev_idx, ma_col]:
+                if df_with_ma.loc[current_idx, ma_col] > df_with_ma.loc[prev_idx, ma_col]:
                     rising_count += 1
             
             if rising_count < 4:
                 is_stage1 = False
-                date_str = target_data.loc[i, 'timestamps'].strftime('%Y-%m-%d')
-                stage1_evidence.append(f"在 {date_str} 上升均线不足4条")
+                stage1_evidence.append(f"在 {df_with_ma.loc[current_idx, 'timestamps'].strftime('%Y-%m-%d')} 上升均线不足4条，不符合stage1特征")
                 break
         
         if is_stage1:
-            # 提取特征向量
             feature_vector = extract_stage_features(target_data, ma_periods)
-            # 计算持续天数
-            duration_days = (original_end - original_start).days
-            # 确定周期类型
-            duration_thresholds = {'stage1': 10, 'stage2': 4, 'stage3': 10}
-            duration_type = "long" if duration_days > duration_thresholds['stage1'] else "short"
-            # 获取预测结果
-            prediction, prob = predict_stage_type(
-                stock_code, original_start, original_end, 
-                'stage1', duration_type, model_base_path, data_folder
+            duration_days = len(target_data)
+            duration_type = "long" if duration_days > 10 else "short"  # 使用stage1默认阈值
+            pred_type, pred_prob = predict_stage_type(
+                stock_code, original_start, original_end, 'stage1',
+                duration_type, model_base_path, data_folder
             )
             return 'stage1', {
-                "evidence": "符合stage1特征",
                 "duration_days": duration_days,
-                "duration_type": duration_type,
-                "prediction": prediction,
-                "probability": prob
+                "prediction": pred_type,
+                "probability": pred_prob
             }, feature_vector
         
-        # 如果都不符合
+        # 7. 所有阶段都不符合
         return 'unknown', {
+            "error": "不符合任何阶段特征",
             "stage3_evidence": stage3_evidence,
             "stage2_evidence": stage2_evidence,
             "stage1_evidence": stage1_evidence
         }, None
         
     except Exception as e:
-        print(f"判断阶段时出错: {str(e)}")
-        return 'unknown', {"error": str(e)}, None
-
+        # 修正错误信息显示，捕获具体异常原因
+        return 'unknown', {"error": f"判断阶段时出错: {str(e)}"}, None
 def extract_stage_features(stage_data, ma_periods):
     """提取阶段特征向量用于相似度计算"""
     features = []
@@ -1012,8 +985,8 @@ def main():
     try:
         # 1. 单只股票阶段判断
         test_stock = "000021"
-        test_start_str = "2024-10-11"
-        test_end_str = "2024-10-31"
+        test_start_str = "2023-03-31"
+        test_end_str = "2023-04-11"
         test_start = datetime.strptime(test_start_str, '%Y-%m-%d')
         test_end = datetime.strptime(test_end_str, '%Y-%m-%d')
 

@@ -6,6 +6,7 @@ from json_config import move_images_to_new_folder, read_json_data, write_json_da
 from pattern_detection import find_similar_patterns, find_pattern_segments, is_golden_cross, is_bullish_arrangement
 from yolo_utils import is_bullish_arrangement as yolo_is_bullish_arrangement
 from utils import calculate_ma, get_exchange_index, get_index_ma_values, get_stock_data
+from deal_sim_final0901 import analyze_stock_data
 from datetime import datetime, timedelta
 import os
 from datetime import datetime
@@ -19,6 +20,14 @@ app = Flask(__name__)
 app.permanent_session_lifetime = timedelta(minutes=30)
 
 CORS(app, resources={r"/detect_stock_mode": {
+    "origins": Config.CORS_ORIGINS,
+    "methods": ["POST", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"],
+    "expose_headers": ["Content-Type"],
+    "supports_credentials": True
+}})
+
+CORS(app, resources={r"/detect_stock_mode_stage": {
     "origins": Config.CORS_ORIGINS,
     "methods": ["POST", "OPTIONS"],
     "allow_headers": ["Content-Type", "Authorization"],
@@ -185,6 +194,49 @@ def detect_stock_mode():
         }
     }
     return jsonify(response)
+
+
+# 阶段转移定位相似模式查找结果的路由
+@app.route('/detect_stock_mode_stage', methods=['POST'])
+def detect_stock_mode_stage():
+    data = request.get_json(force=True)
+    pool = data.get('pool', [])
+    base_code = data.get('base_code', '')
+    base_start_date = data.get('base_start_date', '')
+    base_end_date = data.get('base_end_date', '')
+    start_date = data.get('start_date', '')
+    end_date = data.get('end_date', '')
+    ma_list = data.get('ma_list', [])
+    
+    print(f"接收到请求: 基准股票={base_code}, 基准时间={base_start_date}~{base_end_date}, MA={ma_list}, 股票池大小={len(pool)}")
+    print(pool)
+    if not base_code or not base_start_date or not base_end_date or not ma_list:
+        return jsonify({"error": "缺少必要参数"}), 400
+
+    print(pool)
+    stock_pool = [item['code'] for item in pool]
+    
+    result = analyze_stock_data(
+        test_stock=base_code,
+        test_start=base_start_date,
+        test_end=base_end_date,
+        test_stock_pool=stock_pool,
+        test_start_date=start_date,
+        test_end_date=end_date
+    )
+
+    response = {
+        "result": result,
+        "debug": {
+            "base_code": base_code,
+            "base_date_range": f"{base_start_date}~{base_end_date}",
+            "ma_list": ma_list,
+            "pool_size": len(pool),
+            "search_date_range": f"{start_date}~{end_date}",
+        }
+    }
+    return jsonify(response)
+
 
 # 检测金叉的路由
 @app.route('/detect_golden_cross', methods=['POST'])
