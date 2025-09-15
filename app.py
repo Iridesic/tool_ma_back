@@ -6,19 +6,32 @@ from json_config import move_images_to_new_folder, read_json_data, write_json_da
 from pattern_detection import find_similar_patterns, find_pattern_segments, is_golden_cross, is_bullish_arrangement
 from yolo_utils import is_bullish_arrangement as yolo_is_bullish_arrangement
 from utils import calculate_ma, get_exchange_index, get_index_ma_values, get_stock_data
-from deal_sim_final0901 import analyze_stock_data
+from deal_sim_final0901 import analyze_stock_data, find_stage_fragments
 from datetime import datetime, timedelta
 import os
 from datetime import datetime
 # 首先添加必要的导入
 from deal_sim_time_range import find_similar_stocks, extract_stock_data_from_folder, get_candidate_stocks
 import pandas as pd
+from sim_class0914 import find_stage_segments0914
 
 
 app = Flask(__name__)
 # 将会话有效期延长
 app.permanent_session_lifetime = timedelta(minutes=30)
 
+
+# 离线查找指定stage的路由 #######################################################
+CORS(app, resources={r"/offline_stage": {
+    "origins": Config.CORS_ORIGINS,
+    "methods": ["POST", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"],
+    "expose_headers": ["Content-Type"],
+    "supports_credentials": True
+}})
+
+
+# 检测自定义模式的路由 #######################################################
 CORS(app, resources={r"/detect_stock_mode": {
     "origins": Config.CORS_ORIGINS,
     "methods": ["POST", "OPTIONS"],
@@ -27,6 +40,10 @@ CORS(app, resources={r"/detect_stock_mode": {
     "supports_credentials": True
 }})
 
+# 阶段转移找相似片段（只能横向）################################################
+# 用户输入：一只股票 + 时间区间 + 股票池
+# 系统计算：用户股票时间区间的stage + 股票池相同stage的结果 + 同类结果 + 不同类结果
+# 系统输出：同类结果（超强相似） + 不同类结果（一般相似）
 CORS(app, resources={r"/detect_stock_mode_stage": {
     "origins": Config.CORS_ORIGINS,
     "methods": ["POST", "OPTIONS"],
@@ -35,6 +52,8 @@ CORS(app, resources={r"/detect_stock_mode_stage": {
     "supports_credentials": True
 }})
 
+
+# 检测金叉形态的路由（规则匹配） ###############################################
 CORS(app, resources={r"/detect_golden_cross": {
     "origins": Config.CORS_ORIGINS,
     "methods": ["POST", "OPTIONS"],
@@ -43,20 +62,16 @@ CORS(app, resources={r"/detect_golden_cross": {
     "supports_credentials": True
 }})
 
+# YOLO检测多头排列的路由 ######################################################
 CORS(app, resources={r"/detect_bullish_arrangement": {
     "origins": Config.CORS_ORIGINS,
     "methods": ["POST", "OPTIONS"],
     "allow_headers": ["Content-Type"],
     "supports_credentials": True
 }})
-# 根据模式选股
-CORS(app, resources={r"/detect_sim_stock": {
-    "origins": Config.CORS_ORIGINS,
-    "methods": ["POST", "OPTIONS"],
-    "allow_headers": ["Content-Type"],
-    "supports_credentials": True
-}})
-# 根据模式选股
+
+
+# 根据模式选股（历史模式查找的路由） ############################################
 CORS(app, resources={r"/detect_sim_history": {
     "origins": Config.CORS_ORIGINS,
     "methods": ["POST", "OPTIONS"],
@@ -64,13 +79,8 @@ CORS(app, resources={r"/detect_sim_history": {
     "supports_credentials": True
 }})
 
-################################################################
 
-# 模式选股的路由
-# @app.route('/detect_sim_stock', methods=['POST'])
-# def detect_sim_stock():
 
-# 历史模式查找的路由 0713
 @app.route('/detect_sim_history', methods=['POST'])
 def detect_sim_history():
     data = request.get_json(force=True)
@@ -194,6 +204,50 @@ def detect_stock_mode():
         }
     }
     return jsonify(response)
+
+
+# 阶段转移定位相似模式查找结果的路由
+@app.route('/offline_stage', methods=['POST'])
+def offline_stage():
+    data = request.get_json(force=True)
+    pool = data.get('pool', [])
+    start_date = data.get('start_date', '')
+    end_date = data.get('end_date', '')
+    ma_list = data.get('ma_list', [])
+    stage = data.get('stage', '')
+    
+    print(f"接收到请求: MA={ma_list}, 股票池大小={len(pool)}")
+
+    stock_pool = [item['code'] for item in pool]
+
+    start_date = datetime.strptime(start_date, "%Y-%m-%d")
+    end_date = datetime.strptime(end_date, "%Y-%m-%d")
+
+    result = find_stage_segments0914(
+        stock_pool=stock_pool,
+        start_date=start_date,
+        end_date=end_date,
+        target_stage=stage,
+        ma_periods=ma_list
+    )
+    
+    # result = find_stage_fragments(
+    #     stock_pool=stock_pool,
+    #     start_date=start_date,
+    #     end_date=end_date,
+    #     target_stage=stage,
+    # )
+
+    response = {
+        "result": result,
+        "debug": {
+            "ma_list": ma_list,
+            "pool_size": len(pool),
+            "search_date_range": f"{start_date}~{end_date}",
+        }
+    }
+    return jsonify(response)
+
 
 
 # 阶段转移定位相似模式查找结果的路由

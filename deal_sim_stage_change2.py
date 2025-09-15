@@ -225,7 +225,7 @@ def predict_stage_type(stock_code, start_date, end_date, stage, duration_type, m
     检测股票池中各股票在指定时间区间内均线呈现多头排列的区间，并划分stage1、stage2和stage3
     结果按阶段分类，包含时间区间、股票代码、对应均线数据和多空预测
     """
-def detect_bullish_arrangement(stock_pool, start_date, end_date, 
+def detect_bullish_arrangement1(stock_pool, start_date, end_date, 
                               ma_periods=[4, 8, 12, 16, 20, 47], 
                               data_folder="D:/self/data/kline-data",
                               model_base_path="./models",
@@ -913,7 +913,7 @@ def find_similar_stages(test_stock, test_start_date, test_end_date,
     
     print("\n===== 步骤2: 检测股票池区间 =====")
     # 2. 检测股票池中的所有阶段
-    pool_stages = detect_bullish_arrangement(
+    pool_stages = detect_bullish_arrangement1(
         stock_pool=stock_pool,
         start_date=pool_start_date,
         end_date=pool_end_date,
@@ -1004,7 +1004,7 @@ def main():
         # 2. 股票池阶段检测
         pool_start = (end_date - timedelta(days=120)).strftime('%Y-%m-%d')
         print(f"\n2. 股票池检测 [{pool_start} 至 {end_str}] (共 {len(TEST_STOCK_POOL)} 只)")
-        stages_result = detect_bullish_arrangement(
+        stages_result = detect_bullish_arrangement1(
             stock_pool=TEST_STOCK_POOL,
             start_date=pool_start,
             end_date=end_str,
