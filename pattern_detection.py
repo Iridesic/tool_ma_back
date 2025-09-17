@@ -4,6 +4,207 @@ from typing import List, Dict
 from utils import get_stock_data, get_stock_data1, calculate_ma, calculate_similarity, get_exchange_index, get_index_ma_values
 
 # 查找相似模式
+# def find_similar_patterns(
+#     pool: List[Dict], 
+#     base_code: str, 
+#     base_start_date: str, 
+#     base_end_date: str, 
+#     start_date: str, 
+#     end_date: str, 
+#     ma_list: List[int], 
+#     min_similarity: float = 0.7,
+#     future_days: int = 5  # 从前端传入的未来N天参数，默认5天保持兼容
+# ) -> Dict:
+#     result = {}
+#     all_future_avg_returns = []  # 存储所有相似区间的未来N日平均收益率（用于整体统计）
+    
+#     max_ma = max(ma_list)
+#     base_start_obj = datetime.strptime(base_start_date.split('T')[0], '%Y-%m-%d')
+#     hist_start_date = (base_start_obj - timedelta(days=max_ma * 2)).strftime('%Y-%m-%d')
+    
+#     # 处理基准股票代码
+#     ts_base_code = base_code + '.SH' if base_code.startswith('6') else base_code + '.SZ'
+#     base_data = get_stock_data1(ts_base_code, hist_start_date, base_end_date)
+#     if base_data.empty:
+#         print(f"基准股票 {ts_base_code} 历史数据为空")
+#         return result
+    
+#     base_data = calculate_ma(base_data, ma_list)
+#     if base_data.empty:
+#         print(f"基准股票 {ts_base_code} 计算MA后数据为空")
+#         return result
+    
+#     # 处理日期格式
+#     base_data['trade_date'] = pd.to_datetime(base_data['trade_date'])
+#     base_start_date_obj = pd.to_datetime(base_start_date.split('T')[0])
+#     base_end_date_obj = pd.to_datetime(base_end_date.split('T')[0])
+    
+#     # 提取基准模式的 MA 数据
+#     base_pattern = base_data[
+#         (base_data['trade_date'] >= base_start_date_obj) & 
+#         (base_data['trade_date'] <= base_end_date_obj)
+#     ]
+#     if base_pattern.empty:
+#         print(f"基准时间段内没有MA数据: {base_start_date}~{base_end_date}")
+#         return result
+    
+#     base_ma_values = base_pattern[[f'MA{ma}' for ma in ma_list]].values
+#     min_days = max(5, len(base_ma_values) // 2)
+    
+#     if len(base_ma_values) < min_days:
+#         print(f"基准股票 {ts_base_code} 的数据长度不足: {len(base_ma_values)}")
+#         return result
+    
+#     # 遍历股票池
+#     for item in pool:
+#         print(f"正在处理股票: {item}")
+#         # 兼容单股票或股票池字典格式
+#         ts_code = item.get('code') if isinstance(item, dict) else item  
+#         if not ts_code:
+#             print(f"股票信息中缺少 'code' 字段: {item}")
+#             continue
+        
+#         # 处理股票代码后缀
+#         ts_code_full = ts_code + '.SH' if ts_code.startswith('6') else ts_code + '.SZ'
+        
+#         # 扩展结束日期，用于获取后续N天数据
+#         extended_end_date_obj = pd.to_datetime(end_date.split('T')[0]) + timedelta(days=future_days)
+#         extended_end_date = extended_end_date_obj.strftime('%Y-%m-%d')
+        
+#         # 获取股票数据
+#         stock_data = get_stock_data1(ts_code_full, start_date, extended_end_date)
+#         if stock_data.empty:
+#             print(f"股票 {ts_code_full} 数据为空")
+#             continue
+        
+#         stock_data = calculate_ma(stock_data, ma_list)
+#         if stock_data.empty:
+#             print(f"股票 {ts_code_full} 计算MA后数据为空")
+#             continue
+            
+#         stock_data['trade_date'] = pd.to_datetime(stock_data['trade_date'])
+        
+#         # 检查数据长度
+#         if len(stock_data) < len(base_ma_values):
+#             print(f"股票 {ts_code_full} 的数据长度不足: {len(stock_data)} < {len(base_ma_values)}")
+#             continue
+            
+#         similar_intervals = []
+#         # 滑动窗口查找相似区间
+#         for i in range(0, len(stock_data) - len(base_ma_values) + 1, 2):
+#             current_ma_values = stock_data[[f'MA{ma}' for ma in ma_list]].iloc[i:i+len(base_ma_values)].values
+#             similarity = calculate_similarity(base_ma_values.flatten(), current_ma_values.flatten())
+            
+#             if similarity >= min_similarity:
+#                 # 记录区间日期
+#                 start = stock_data.iloc[i]['trade_date'].strftime('%Y-%m-%d')
+#                 end = stock_data.iloc[i+len(base_ma_values)-1]['trade_date'].strftime('%Y-%m-%d')
+                
+#                 # 记录 MA 值和日期
+#                 ma_values_in_interval = stock_data[[f'MA{ma}' for ma in ma_list]].iloc[i:i+len(base_ma_values)].values.tolist()
+#                 # 对MA值保留两位小数
+#                 ma_values_in_interval = [[round(val, 2) for val in ma_row] for ma_row in ma_values_in_interval]
+#                 x_axis_dates = stock_data['trade_date'].iloc[i:i+len(base_ma_values)].dt.strftime('%m%d').tolist()
+                
+#                 # 获取区间后N天数据（用于后续分析）
+#                 post_start_idx = i + len(base_ma_values)
+#                 post_end_idx = post_start_idx + future_days
+#                 post_end_idx = min(post_end_idx, len(stock_data))
+                
+#                 post_ma_values = []
+#                 post_dates = []
+#                 if post_start_idx < len(stock_data):
+#                     post_data = stock_data.iloc[post_start_idx:post_end_idx]
+#                     post_ma_values = post_data[[f'MA{ma}' for ma in ma_list]].values.tolist()
+#                     # 对后续MA值保留两位小数
+#                     post_ma_values = [[round(val, 2) for val in ma_row] for ma_row in post_ma_values]
+#                     post_dates = post_data['trade_date'].dt.strftime('%m%d').tolist()
+                
+#                 # -----------------------
+#                 # 计算未来N天的各项指标
+#                 # -----------------------
+#                 future_data = stock_data.iloc[post_start_idx:post_end_idx]
+#                 future_indicators = {}
+                
+#                 if not future_data.empty:
+#                     # 基准价格（模式结束后第一日收盘价）
+#                     P0 = future_data.iloc[0]['close']
+#                     closes = future_data['close'].tolist()
+                    
+#                     # 1. 平均收益率
+#                     returns = []
+#                     for j in range(1, len(closes)):
+#                         Pi = closes[j]
+#                         Ri = (Pi - P0) / P0 * 100  # 百分比收益率
+#                         returns.append(Ri)
+#                     avg_return = round(sum(returns) / len(returns) if returns else 0, 2)
+#                     future_indicators['avg_return'] = avg_return
+                    
+#                     # 2. 最大回撤幅度
+#                     max_price = max(closes)
+#                     min_after_max = min(closes[closes.index(max_price):]) if closes else P0
+#                     max_drawdown = round(((max_price - min_after_max) / max_price) * 100 if max_price != 0 else 0, 2)
+#                     future_indicators['max_drawdown'] = max_drawdown
+                    
+#                     # 3. 最大涨幅
+#                     max_rise = round(max([(p - P0) / P0 * 100 for p in closes[1:]]) if len(closes) > 1 else 0, 2)
+#                     future_indicators['max_rise'] = max_rise
+                    
+#                     # 4. 最大跌幅
+#                     max_fall = round(min([(p - P0) / P0 * 100 for p in closes[1:]]) if len(closes) > 1 else 0, 2)
+#                     future_indicators['max_fall'] = max_fall
+                    
+#                     # 5. 胜率（上涨天数占比）
+#                     up_days = sum(1 for r in returns if r > 0)
+#                     total_days = len(returns)
+#                     win_rate = round((up_days / total_days) * 100 if total_days > 0 else 0, 2)
+#                     future_indicators['win_rate'] = win_rate
+                    
+#                     # 加入整体统计列表（仅平均收益率）
+#                     all_future_avg_returns.append(avg_return)
+#                 else:
+#                     # 无数据时各项指标置0
+#                     future_indicators = {
+#                         'avg_return': 0.00,
+#                         'max_drawdown': 0.00,
+#                         'max_rise': 0.00,
+#                         'max_fall': 0.00,
+#                         'win_rate': 0.00
+#                     }
+                
+#                 # 存入相似区间结果，相似度保留两位小数
+#                 similar_intervals.append({
+#                     'start_date': start,
+#                     'end_date': end,
+#                     'similarity': round(float(similarity), 2),
+#                     'ma_values': ma_values_in_interval,
+#                     'x_axis_dates': x_axis_dates,
+#                     'post_ma_values': post_ma_values,  
+#                     'post_dates': post_dates,  
+#                     **future_indicators  # 展开未来N天指标
+#                 })
+        
+#         # 筛选 top10 相似区间
+#         if similar_intervals:
+#             similar_intervals.sort(key=lambda x: x['similarity'], reverse=True)
+#             result[ts_code_full] = similar_intervals[:10]
+
+#     # 计算整体平均收益率（基于所有结果的未来N日平均收益率），保留两位小数
+#     overall_future_avg_return = round(
+#         sum(all_future_avg_returns) / len(all_future_avg_returns) 
+#         if all_future_avg_returns 
+#         else 0, 2
+#     )
+    
+#     # 组装最终结果
+#     final_result = {
+#         'stock_patterns': result,
+#         'overall_future_avg_return': overall_future_avg_return
+#     }
+    
+#     print(f"找到相似模式的股票数量: {len(result)}")
+#     return final_result
+# 查找相似模式
 def find_similar_patterns(
     pool: List[Dict], 
     base_code: str, 
@@ -12,10 +213,11 @@ def find_similar_patterns(
     start_date: str, 
     end_date: str, 
     ma_list: List[int], 
-    min_similarity: float = 0.7
+    min_similarity: float = 0.7,
+    future_days: int = 5  # 从前端传入的未来N天参数，默认5天保持兼容
 ) -> Dict:
-    result = {}
-    all_five_day_avg_returns = []  # 存储所有相似区间的五日平均收益率
+    all_similar_intervals = []  # 存储所有股票的相似区间，不按股票分组
+    all_future_avg_returns = []  # 存储所有相似区间的未来N日平均收益率（用于整体统计）
     
     max_ma = max(ma_list)
     base_start_obj = datetime.strptime(base_start_date.split('T')[0], '%Y-%m-%d')
@@ -26,12 +228,12 @@ def find_similar_patterns(
     base_data = get_stock_data1(ts_base_code, hist_start_date, base_end_date)
     if base_data.empty:
         print(f"基准股票 {ts_base_code} 历史数据为空")
-        return result
+        return {"stock_patterns": [], "overall_future_avg_return": 0.00}
     
     base_data = calculate_ma(base_data, ma_list)
     if base_data.empty:
         print(f"基准股票 {ts_base_code} 计算MA后数据为空")
-        return result
+        return {"stock_patterns": [], "overall_future_avg_return": 0.00}
     
     # 处理日期格式
     base_data['trade_date'] = pd.to_datetime(base_data['trade_date'])
@@ -45,32 +247,40 @@ def find_similar_patterns(
     ]
     if base_pattern.empty:
         print(f"基准时间段内没有MA数据: {base_start_date}~{base_end_date}")
-        return result
+        return {"stock_patterns": [], "overall_future_avg_return": 0.00}
     
     base_ma_values = base_pattern[[f'MA{ma}' for ma in ma_list]].values
     min_days = max(5, len(base_ma_values) // 2)
     
     if len(base_ma_values) < min_days:
         print(f"基准股票 {ts_base_code} 的数据长度不足: {len(base_ma_values)}")
-        return result
+        return {"stock_patterns": [], "overall_future_avg_return": 0.00}
     
-    # 遍历股票池
-    for item in pool:
-        print(f"正在处理股票: {item}")
-        # 兼容单股票或股票池字典格式
-        ts_code = item.get('code') if isinstance(item, dict) else item  
+    # 遍历股票池 - 保持与历史版本相同的股票处理逻辑
+    for stock_item in pool:
+        print(f"正在处理股票: {stock_item}")
+        
+        # 修复股票代码提取逻辑，兼容不同格式的输入
+        if isinstance(stock_item, dict):
+            ts_code = stock_item.get('code')  # 处理字典类型的股票项
+        elif isinstance(stock_item, str):
+            ts_code = stock_item  # 处理字符串类型的股票代码
+        else:
+            print(f"不支持的股票数据类型: {type(stock_item)}")
+            continue
+            
         if not ts_code:
-            print(f"股票信息中缺少 'code' 字段: {item}")
+            print(f"股票信息中缺少有效的代码: {stock_item}")
             continue
         
         # 处理股票代码后缀
         ts_code_full = ts_code + '.SH' if ts_code.startswith('6') else ts_code + '.SZ'
         
-        # 扩展结束日期，用于获取后续 30 天数据
-        extended_end_date_obj = pd.to_datetime(end_date.split('T')[0]) + timedelta(days=30)
+        # 扩展结束日期，用于获取后续N天数据
+        extended_end_date_obj = pd.to_datetime(end_date.split('T')[0]) + timedelta(days=future_days)
         extended_end_date = extended_end_date_obj.strftime('%Y-%m-%d')
         
-        # 获取股票数据
+        # 获取股票数据 - 保持原有数据获取逻辑不变
         stock_data = get_stock_data1(ts_code_full, start_date, extended_end_date)
         if stock_data.empty:
             print(f"股票 {ts_code_full} 数据为空")
@@ -88,10 +298,12 @@ def find_similar_patterns(
             print(f"股票 {ts_code_full} 的数据长度不足: {len(stock_data)} < {len(base_ma_values)}")
             continue
             
-        similar_intervals = []
-        # 滑动窗口查找相似区间
+        # 滑动窗口查找相似区间 - 核心相似度计算逻辑完全保留
         for i in range(0, len(stock_data) - len(base_ma_values) + 1, 2):
+            # 提取当前窗口的MA值 - 与历史版本完全一致
             current_ma_values = stock_data[[f'MA{ma}' for ma in ma_list]].iloc[i:i+len(base_ma_values)].values
+            
+            # 相似度计算逻辑完全保留，未做任何修改
             similarity = calculate_similarity(base_ma_values.flatten(), current_ma_values.flatten())
             
             if similarity >= min_similarity:
@@ -101,11 +313,12 @@ def find_similar_patterns(
                 
                 # 记录 MA 值和日期
                 ma_values_in_interval = stock_data[[f'MA{ma}' for ma in ma_list]].iloc[i:i+len(base_ma_values)].values.tolist()
+                ma_values_in_interval = [[round(val, 2) for val in ma_row] for ma_row in ma_values_in_interval]
                 x_axis_dates = stock_data['trade_date'].iloc[i:i+len(base_ma_values)].dt.strftime('%m%d').tolist()
                 
-                # 获取区间后 30 天数据（用于后续分析）
+                # 获取区间后N天数据
                 post_start_idx = i + len(base_ma_values)
-                post_end_idx = post_start_idx + 30
+                post_end_idx = post_start_idx + future_days
                 post_end_idx = min(post_end_idx, len(stock_data))
                 
                 post_ma_values = []
@@ -113,63 +326,87 @@ def find_similar_patterns(
                 if post_start_idx < len(stock_data):
                     post_data = stock_data.iloc[post_start_idx:post_end_idx]
                     post_ma_values = post_data[[f'MA{ma}' for ma in ma_list]].values.tolist()
+                    post_ma_values = [[round(val, 2) for val in ma_row] for ma_row in post_ma_values]
                     post_dates = post_data['trade_date'].dt.strftime('%m%d').tolist()
                 
-                # -----------------------
-                # 关键修改：计算五日平均收益率（以模式出现后第一日为基准）
-                # -----------------------
-                five_days_end_idx = min(post_start_idx + 5, len(stock_data))
-                five_days_data = stock_data.iloc[post_start_idx:five_days_end_idx]
+                # 计算未来N天的各项指标
+                future_data = stock_data.iloc[post_start_idx:post_end_idx]
+                future_indicators = {}
                 
-                if not five_days_data.empty:
-                    P0 = five_days_data.iloc[0]['close']  # 模式出现后第一日的收盘价
-                    returns = []
-                    for j in range(1, len(five_days_data)):
-                        Pi = five_days_data.iloc[j]['close']
-                        Ri = (Pi - P0) / P0 * 100  # 计算第j日相对于P0的收益率（百分比）
-                        returns.append(Ri)
+                if not future_data.empty:
+                    P0 = future_data.iloc[0]['close']
+                    closes = future_data['close'].tolist()
                     
-                    # 计算平均收益率（不足5天按实际天数）
-                    five_day_avg_return = sum(returns) / len(returns) if returns else 0
+                    # 1. 平均收益率
+                    returns = []
+                    for j in range(1, len(closes)):
+                        Pi = closes[j]
+                        Ri = (Pi - P0) / P0 * 100
+                        returns.append(Ri)
+                    avg_return = round(sum(returns) / len(returns) if returns else 0, 2)
+                    future_indicators['avg_return'] = avg_return
+                    
+                    # 2. 最大回撤幅度
+                    max_price = max(closes)
+                    min_after_max = min(closes[closes.index(max_price):]) if closes else P0
+                    max_drawdown = round(((max_price - min_after_max) / max_price) * 100 if max_price != 0 else 0, 2)
+                    future_indicators['max_drawdown'] = max_drawdown
+                    
+                    # 3. 最大涨幅
+                    max_rise = round(max([(p - P0) / P0 * 100 for p in closes[1:]]) if len(closes) > 1 else 0, 2)
+                    future_indicators['max_rise'] = max_rise
+                    
+                    # 4. 最大跌幅
+                    max_fall = round(min([(p - P0) / P0 * 100 for p in closes[1:]]) if len(closes) > 1 else 0, 2)
+                    future_indicators['max_fall'] = max_fall
+                    
+                    # 5. 胜率
+                    up_days = sum(1 for r in returns if r > 0)
+                    total_days = len(returns)
+                    win_rate = round((up_days / total_days) * 100 if total_days > 0 else 0, 2)
+                    future_indicators['win_rate'] = win_rate
+                    
+                    all_future_avg_returns.append(avg_return)
                 else:
-                    five_day_avg_return = 0
+                    future_indicators = {
+                        'avg_return': 0.00,
+                        'max_drawdown': 0.00,
+                        'max_rise': 0.00,
+                        'max_fall': 0.00,
+                        'win_rate': 0.00
+                    }
                 
-                all_five_day_avg_returns.append(five_day_avg_return)
-                
-                # 存入相似区间结果
-                similar_intervals.append({
+                # 存入所有相似区间列表，增加stockCode字段
+                all_similar_intervals.append({
+                    'stockCode': ts_code_full,  # 新增股票代码字段
                     'start_date': start,
                     'end_date': end,
-                    'similarity': float(similarity),
+                    'similarity': round(float(similarity), 2),
                     'ma_values': ma_values_in_interval,
                     'x_axis_dates': x_axis_dates,
                     'post_ma_values': post_ma_values,  
                     'post_dates': post_dates,  
-                    'five_day_avg_return': five_day_avg_return  
+                    **future_indicators
                 })
-        
-        # 筛选 top10 相似区间
-        if similar_intervals:
-            similar_intervals.sort(key=lambda x: x['similarity'], reverse=True)
-            result[ts_code_full] = similar_intervals[:10]
-
+    
+    # 按相似度降序排序所有结果
+    all_similar_intervals.sort(key=lambda x: x['similarity'], reverse=True)
+    
     # 计算整体平均收益率
-    overall_five_day_avg_return = (
-        sum(all_five_day_avg_returns) / len(all_five_day_avg_returns) 
-        if all_five_day_avg_returns 
-        else 0
+    overall_future_avg_return = round(
+        sum(all_future_avg_returns) / len(all_future_avg_returns) 
+        if all_future_avg_returns 
+        else 0, 2
     )
     
     # 组装最终结果
     final_result = {
-        'stock_patterns': result,
-        'overall_five_day_avg_return': overall_five_day_avg_return
+        'stock_patterns': all_similar_intervals,
+        'overall_future_avg_return': overall_future_avg_return
     }
     
-    print(f"找到相似模式的股票数量: {len(result)}")
-    return final_result
-
-
+    print(f"找到的相似模式总数: {len(all_similar_intervals)}")
+    return final_result  
 
 # 检测金叉的函数
 def is_golden_cross(data, short_ma, long_ma):

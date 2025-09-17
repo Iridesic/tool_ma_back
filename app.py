@@ -144,6 +144,66 @@ def detect_sim_history():
     return jsonify(response)
 
 # 检测自定义模式的路由
+# @app.route('/detect_stock_mode', methods=['POST'])
+# def detect_stock_mode():
+#     data = request.get_json(force=True)
+#     pool = data.get('pool', [])
+#     base_code = data.get('base_code', '')
+#     base_start_date = data.get('base_start_date', '')
+#     base_end_date = data.get('base_end_date', '')
+#     start_date = data.get('start_date', '')
+#     end_date = data.get('end_date', '')
+#     ma_list = data.get('ma_list', [])
+    
+#     print(f"接收到请求: 基准股票={base_code}, 基准时间={base_start_date}~{base_end_date}, MA={ma_list}, 股票池大小={len(pool)}")
+    
+#     if not base_code or not base_start_date or not base_end_date or not ma_list:
+#         return jsonify({"error": "缺少必要参数"}), 400
+    
+#     stock_mode = find_similar_patterns(pool, base_code, base_start_date, base_end_date, start_date, end_date, ma_list)
+    
+#     patterns = stock_mode.get('stock_patterns', {})
+#     overall_return = stock_mode.get('overall_five_day_avg_return', 0)
+#     stock_mode = patterns if patterns else {}
+
+#     base_index_code = get_exchange_index(base_code)
+    
+#     for stock_code, intervals in stock_mode.items():
+#         index_code = get_exchange_index(stock_code.split('.')[0])
+        
+#         for interval in intervals:
+#             start_date = interval['start_date']
+#             end_date = interval['end_date']
+            
+#             # 获取该区间内的指数MA值（使用改进方法）
+#             index_ma_values = get_index_ma_values(index_code, start_date, end_date, ma_list)
+            
+#             if index_ma_values:
+#                 interval['index_code'] = index_code
+#                 interval['index_ma_values'] = index_ma_values
+#                 interval['index_name'] = "上证指数" if index_code == '000001' else "深证成指"
+#             else:
+#                 # 创建与股票MA值相同结构的全0数组
+#                 dummy_index_ma = [[0.0] * len(ma_list) for _ in range(5)]  # 固定为5个点
+#                 interval['index_code'] = index_code
+#                 interval['index_ma_values'] = dummy_index_ma
+#                 interval['index_name'] = "上证指数" if index_code == '000001' else "深证成指"
+#                 interval['index_error'] = "获取指数数据失败"
+
+#     response = {
+#         "result": stock_mode,
+#         "overall_return": overall_return,
+#         "debug": {
+#             "base_code": base_code,
+#             "base_date_range": f"{base_start_date}~{base_end_date}",
+#             "ma_list": ma_list,
+#             "pool_size": len(pool),
+#             "search_date_range": f"{start_date}~{end_date}",
+#             "base_index_code": base_index_code,
+#             "base_index_name": "上证指数" if base_index_code == '000001' else "深证成指",
+#         }
+#     }
+#     return jsonify(response)
 @app.route('/detect_stock_mode', methods=['POST'])
 def detect_stock_mode():
     data = request.get_json(force=True)
@@ -154,44 +214,59 @@ def detect_stock_mode():
     start_date = data.get('start_date', '')
     end_date = data.get('end_date', '')
     ma_list = data.get('ma_list', [])
+    future_days = data.get('future_days', 5)  # 新增：获取前端传入的未来天数参数
     
-    print(f"接收到请求: 基准股票={base_code}, 基准时间={base_start_date}~{base_end_date}, MA={ma_list}, 股票池大小={len(pool)}")
+    print(f"接收到请求: 基准股票={base_code}, 基准时间={base_start_date}~{base_end_date}, MA={ma_list}, 股票池大小={len(pool)}, 未来天数={future_days}")
     
     if not base_code or not base_start_date or not base_end_date or not ma_list:
         return jsonify({"error": "缺少必要参数"}), 400
     
-    stock_mode = find_similar_patterns(pool, base_code, base_start_date, base_end_date, start_date, end_date, ma_list)
+    # 调用修改后的find_similar_patterns函数，传入future_days参数
+    stock_mode = find_similar_patterns(
+        pool, 
+        base_code, 
+        base_start_date, 
+        base_end_date, 
+        start_date, 
+        end_date, 
+        ma_list,
+        future_days=future_days  # 传递未来天数参数
+    )
     
-    patterns = stock_mode.get('stock_patterns', {})
-    overall_return = stock_mode.get('overall_five_day_avg_return', 0)
-    stock_mode = patterns if patterns else {}
-
+    # 从结果中获取扁平化的相似模式列表和整体平均收益率
+    patterns = stock_mode.get('stock_patterns', [])  # 现在是列表而不是字典
+    overall_return = stock_mode.get('overall_future_avg_return', 0)  # 字段名更新
+    
     base_index_code = get_exchange_index(base_code)
     
-    for stock_code, intervals in stock_mode.items():
+    # 遍历所有相似区间（现在是列表直接遍历，而非按股票分组遍历）
+    for interval in patterns:
+        # 从区间数据中获取股票代码
+        stock_code = interval['stockCode']
+        # 获取对应指数代码
         index_code = get_exchange_index(stock_code.split('.')[0])
         
-        for interval in intervals:
-            start_date = interval['start_date']
-            end_date = interval['end_date']
-            
-            # 获取该区间内的指数MA值（使用改进方法）
-            index_ma_values = get_index_ma_values(index_code, start_date, end_date, ma_list)
-            
-            if index_ma_values:
-                interval['index_code'] = index_code
-                interval['index_ma_values'] = index_ma_values
-                interval['index_name'] = "上证指数" if index_code == '000001' else "深证成指"
-            else:
-                # 创建与股票MA值相同结构的全0数组
-                dummy_index_ma = [[0.0] * len(ma_list) for _ in range(5)]  # 固定为5个点
-                interval['index_code'] = index_code
-                interval['index_ma_values'] = dummy_index_ma
-                interval['index_name'] = "上证指数" if index_code == '000001' else "深证成指"
-                interval['index_error'] = "获取指数数据失败"
+        start_date = interval['start_date']
+        end_date = interval['end_date']
+        
+        # 获取该区间内的指数MA值
+        index_ma_values = get_index_ma_values(index_code, start_date, end_date, ma_list)
+        
+        if index_ma_values:
+            interval['index_code'] = index_code
+            interval['index_ma_values'] = index_ma_values
+            interval['index_name'] = "上证指数" if index_code == '000001' else "深证成指"
+        else:
+            # 创建与股票MA值相同结构的全0数组
+            # 动态匹配MA值长度而非固定为5
+            dummy_index_ma = [[0.0 for _ in ma_list] for _ in range(len(interval['ma_values']))]
+            interval['index_code'] = index_code
+            interval['index_ma_values'] = dummy_index_ma
+            interval['index_name'] = "上证指数" if index_code == '000001' else "深证成指"
+            interval['index_error'] = "获取指数数据失败"
 
     response = {
-        "result": stock_mode,
+        "result": patterns,  # 直接返回扁平化列表
         "overall_return": overall_return,
         "debug": {
             "base_code": base_code,
@@ -201,10 +276,10 @@ def detect_stock_mode():
             "search_date_range": f"{start_date}~{end_date}",
             "base_index_code": base_index_code,
             "base_index_name": "上证指数" if base_index_code == '000001' else "深证成指",
+            "future_days": future_days  # 调试信息中增加未来天数
         }
     }
     return jsonify(response)
-
 
 # 阶段转移定位相似模式查找结果的路由
 @app.route('/offline_stage', methods=['POST'])
@@ -230,13 +305,6 @@ def offline_stage():
         target_stage=stage,
         ma_periods=ma_list
     )
-    
-    # result = find_stage_fragments(
-    #     stock_pool=stock_pool,
-    #     start_date=start_date,
-    #     end_date=end_date,
-    #     target_stage=stage,
-    # )
 
     response = {
         "result": result,
