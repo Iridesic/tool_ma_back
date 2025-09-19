@@ -2,6 +2,7 @@ import shutil
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from config import Config
+from deal_stock_choose0918 import find_N_days_bullish_0919
 from json_config import move_images_to_new_folder, read_json_data, write_json_data
 from pattern_detection import find_similar_patterns, find_pattern_segments, is_golden_cross, is_bullish_arrangement
 from yolo_utils import is_bullish_arrangement as yolo_is_bullish_arrangement
@@ -23,6 +24,15 @@ app.permanent_session_lifetime = timedelta(minutes=30)
 
 # 离线查找指定stage的路由 #######################################################
 CORS(app, resources={r"/offline_stage": {
+    "origins": Config.CORS_ORIGINS,
+    "methods": ["POST", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"],
+    "expose_headers": ["Content-Type"],
+    "supports_credentials": True
+}})
+
+# 在线查找近N天指定stage的路由 ##################################################
+CORS(app, resources={r"/online_recent_N_stage": {
     "origins": Config.CORS_ORIGINS,
     "methods": ["POST", "OPTIONS"],
     "allow_headers": ["Content-Type", "Authorization"],
@@ -78,7 +88,6 @@ CORS(app, resources={r"/detect_sim_history": {
     "allow_headers": ["Content-Type"],
     "supports_credentials": True
 }})
-
 
 
 @app.route('/detect_sim_history', methods=['POST'])
@@ -280,6 +289,32 @@ def detect_stock_mode():
         }
     }
     return jsonify(response)
+
+# 在线定位近N天stage+输出分类的路由
+@app.route('/online_recent_N_stage', methods=['POST'])
+def online_recent_N_stage():
+    # 前端传入参数
+    data = request.get_json(force=True)
+    pool = data.get('pool', [])
+    n_days = data.get('n_days', '')
+    ma_periods = data.get('ma_periods', '')
+
+    # 系统默认参数 
+    min_fragment_length = 3
+    stage1_lookback = 30
+    target_folder = r"D:\self\code\tool_ma_back\bbb_fragments"
+    # 生成目标文件夹中csv
+    all_results, stage_results = find_N_days_bullish_0919(pool, n_days, ma_periods, min_fragment_length, stage1_lookback, target_folder)
+    
+    response = {
+        "all_results": all_results,
+        "stage_results": stage_results,
+        "debug": {
+            "pool_size": len(pool),
+        }
+    }
+    return jsonify(response)
+
 
 # 阶段转移定位相似模式查找结果的路由
 @app.route('/offline_stage', methods=['POST'])
