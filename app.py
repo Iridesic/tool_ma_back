@@ -15,6 +15,8 @@ from datetime import datetime
 from deal_sim_time_range import find_similar_stocks, extract_stock_data_from_folder, get_candidate_stocks
 import pandas as pd
 from sim_class0914 import find_stage_segments0914
+import numpy as np
+import re
 
 
 app = Flask(__name__)
@@ -254,10 +256,8 @@ def detect_stock_mode():
         stock_code = interval['stockCode']
         # 获取对应指数代码
         index_code = get_exchange_index(stock_code.split('.')[0])
-        
         start_date = interval['start_date']
         end_date = interval['end_date']
-        
         # 获取该区间内的指数MA值
         index_ma_values = get_index_ma_values(index_code, start_date, end_date, ma_list)
         
@@ -290,13 +290,41 @@ def detect_stock_mode():
     }
     return jsonify(response)
 
-# 在线定位近N天stage+输出分类的路由
+def convert_ndarrays_to_lists(obj):
+    """增强版：处理更复杂的嵌套结构"""
+    import numpy as np
+    
+    # 处理ndarray
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    
+    # 处理列表和元组
+    if isinstance(obj, (list, tuple)):
+        return [convert_ndarrays_to_lists(item) for item in obj]
+    
+    # 处理字典
+    if isinstance(obj, dict):
+        return {k: convert_ndarrays_to_lists(v) for k, v in obj.items()}
+    
+    # 处理NumPy数值类型
+    if isinstance(obj, np.generic):
+        return obj.item()  # 将numpy int/float转换为Python原生类型
+    
+    return obj
+
+# 在线定位近N天stage+输出分类的路由 ######################################################################
 @app.route('/online_recent_N_stage', methods=['POST'])
 def online_recent_N_stage():
     # 前端传入参数
     data = request.get_json(force=True)
     pool = data.get('pool', [])
     n_days = data.get('n_days', '')
+    match = re.search(r'\d+', n_days)
+    if match:
+        number = int(match.group())
+        print(number)  # 输出: 40
+    else:
+        print("未找到数字")
     ma_periods = data.get('ma_periods', '')
 
     # 系统默认参数 
@@ -304,16 +332,19 @@ def online_recent_N_stage():
     stage1_lookback = 30
     target_folder = r"D:\self\code\tool_ma_back\bbb_fragments"
     # 生成目标文件夹中csv
-    all_results, stage_results = find_N_days_bullish_0919(pool, n_days, ma_periods, min_fragment_length, stage1_lookback, target_folder)
+    print("执行app.py中flask函数")
+    all_results = find_N_days_bullish_0919(pool, number, ma_periods, min_fragment_length, stage1_lookback, target_folder)
+    print(type(all_results))
     
     response = {
         "all_results": all_results,
-        "stage_results": stage_results,
         "debug": {
             "pool_size": len(pool),
         }
     }
-    return jsonify(response)
+    # 转换所有ndarray为列表（关键修复）
+    converted_response = convert_ndarrays_to_lists(response)
+    return jsonify(converted_response)
 
 
 # 阶段转移定位相似模式查找结果的路由

@@ -116,7 +116,9 @@ def extract_stage_features(stage_data, ma_periods=[4, 8, 12, 16, 20, 47]):
         diff = (stage_data[current_ma] - stage_data[next_ma]).mean()
         features.append(diff)
     
-    return np.array(features)
+    # 将NumPy数组转换为Python列表
+    return features  # 原代码是 return np.array(features)
+
 
 def classify_stages_from_data(stock_code, full_data, ma_periods=[4, 8, 12, 16, 20, 47],
                              duration_thresholds={'stage1': 10, 'stage2': 4, 'stage3': 10}):
@@ -154,7 +156,8 @@ def classify_stages_from_data(stock_code, full_data, ma_periods=[4, 8, 12, 16, 2
             'end': interval['end_date'].strftime('%Y-%m-%d'),
             'duration_days': interval['duration'],
             'duration_type': "long" if interval['duration'] > duration_thresholds['stage1'] else "short",
-            'feature_vector': feature_vector,
+            # 转换为列表
+            'feature_vector': feature_vector.tolist() if hasattr(feature_vector, 'tolist') else feature_vector,
             'probabilities': probabilities
         })
     
@@ -246,96 +249,138 @@ def classify_from_csv(csv_file_path, ma_periods=[4, 8, 12, 16, 20, 47]):
         print(f"从CSV分类出错: {str(e)}")
         return None
 
-def get_stage_class_from_csv0919(ma_periods=[4, 8, 12, 16, 20, 47]):
+def get_stage_class_from_csv0919(ma_periods=[4, 8, 12, 16, 20, 47], recent_days=60):
     # 配置测试参数
+    print("执行:处理csv过程")
     data_folder = r"D:\self\code\tool_ma_back\bbb_fragments"  # 包含stage标记的CSV文件目录
     result_folder = r"D:\self\code\tool_ma_back\bbb_result"
-    
+    ma_data_folder = r"D:\self\data\final_data_0821"  # 新增：存储均线数据的文件夹
+
     os.makedirs(result_folder, exist_ok=True)
     feature_window_size = 60  # 特征计算窗口大小（60条数据）
     
     print(f"===== 开始基于实际stage标记的分类测试 =====")
     print(f"数据文件夹: {data_folder}")
+    print(f"均线数据文件夹: {ma_data_folder}")  # 新增：显示均线数据文件夹
     print(f"均线周期: {ma_periods}")
     print(f"特征计算窗口: {feature_window_size}条数据")
     print(f"长短周期阈值: {DURATION_THRESHOLDS}")
+    print(f"返回的近期MA数据天数: {recent_days}")
     print("---------------------------------\n")
     
-    all_results = []
+    # 修改返回结果的结构，包含详细信息
+    detailed_results = []
     csv_files = [f for f in os.listdir(data_folder) if f.endswith('.csv')]
     print(f"发现 {len(csv_files)} 个CSV文件，开始处理...\n")
     
     for csv_file in csv_files:
         stock_code = os.path.splitext(csv_file)[0]
         csv_path = os.path.join(data_folder, csv_file)
+        ma_csv_path = os.path.join(ma_data_folder, f"{stock_code[:6]}.csv")  # 对应股票的均线数据文件
         
         print(f"处理文件: {csv_file} (股票代码: {stock_code})")
         
+        # 检查均线数据文件是否存在
+        if not os.path.exists(ma_csv_path):
+            print(f"  警告: 对应的均线数据文件不存在: {ma_csv_path}，跳过\n")
+            continue
+        
         try:
-            # 读取CSV文件（包含stage标记）
+            # 读取stage标记的CSV文件
             with open(csv_path, 'rb') as f:
                 encoding = chardet.detect(f.read())['encoding'] or 'utf-8'
             
-            df = pd.read_csv(csv_path, encoding=encoding)
-            df['timestamps'] = pd.to_datetime(df['timestamps'])
-            df = df.sort_values('timestamps').reset_index(drop=True)  # 确保数据按时间排序
+            df_stage = pd.read_csv(csv_path, encoding=encoding)
+            df_stage['timestamps'] = pd.to_datetime(df_stage['timestamps'])
+            df_stage = df_stage.sort_values('timestamps').reset_index(drop=True)  # 确保数据按时间排序
             
-            if 'stage' not in df.columns:
+
+            if 'stage' not in df_stage.columns:
                 print(f"警告: 文件 {csv_file} 不包含stage标记，跳过\n")
                 continue
+
+            df_stage = calculate_ma(df_stage, ma_periods)
             
-            # 计算均线（保留所有行，不删除NA值）
-            df = calculate_ma(df, ma_periods)
+            # [MA数据提取]读取对应股票的均线数据CSV文件 ###########################
+            with open(ma_csv_path, 'rb') as f:
+                ma_encoding = chardet.detect(f.read())['encoding'] or 'utf-8'
+            
+            df_ma = pd.read_csv(ma_csv_path, encoding=ma_encoding)
+            df_ma['timestamps'] = pd.to_datetime(df_ma['timestamps'])
+            df_ma = df_ma.sort_values('timestamps').reset_index(drop=True)  # 确保均线数据按时间排序
+            
+            # 验证均线列是否存在
+            required_ma_columns = [f'MA{p}' for p in ma_periods]
+            missing_columns = [col for col in required_ma_columns if col not in df_ma.columns]
+            if missing_columns:
+                print(f"  错误: 均线文件中缺失列 {missing_columns}")
+                continue  # 跳过当前文件处理
+            
+            # 提取近N天的MA数据（最后N条记录）
+            recent_ma_data = df_ma.tail(recent_days)[['timestamps'] + required_ma_columns].copy()
+            # 转换为字典格式，便于前端处理
+            recent_ma_list = recent_ma_data.to_dict('records')
+            for item in recent_ma_list:
+                item['timestamps'] = item['timestamps'].isoformat()  # 转换为ISO格式日期字符串
+            
+            ##########################################################
             
             # 按不同stage值分组，获取每个stage的首个出现位置
             stage_first_occurrences = {}
             for stage in [1, 2, 3]:
-                mask = (df['stage'] == stage)
+                mask = (df_stage['stage'] == stage)
                 if mask.any():
-                    first_idx = df[mask].index.min()
+                    first_idx = df_stage[mask].index.min()
                     stage_first_occurrences[stage] = first_idx
             
             # 处理每个stage的首个出现
-            stage_results = {
-                'stage1': {'long': [], 'short': []},
-                'stage2': {'long': [], 'short': []},
-                'stage3': {'long': [], 'short': []}
-            }
-            
             for stage, first_idx in stage_first_occurrences.items():
                 stage_name = f'stage{stage}'
                 print(f"  处理{stage_name}首个出现位置: 索引 {first_idx}")
                 
-                # 计算特征窗口的起始索引（首个stage数据点之前的60条数据）
-                feature_start_idx = max(0, first_idx - feature_window_size)
-                feature_end_idx = first_idx - 1  # 不包含首个stage数据点本身
+                # 获取该位置的时间戳，用于定位均线数据
+                target_timestamp = df_stage.loc[first_idx, 'timestamps']
+                
+                # 计算特征窗口的时间范围（首个stage数据点之前的60条数据）
+                # 在均线数据中找到对应的时间点
+                ma_target_idx = df_stage[df_stage['timestamps'] == target_timestamp].index
+                if not len(ma_target_idx):
+                    print(f"  警告: 在均线数据中未找到对应时间点 {target_timestamp}，跳过\n")
+                    continue
+                ma_target_idx = ma_target_idx[0]
+                
+                # 计算特征窗口的起始索引
+                feature_start_idx = max(0, ma_target_idx - feature_window_size)
+                feature_end_idx = ma_target_idx - 1  # 不包含首个stage数据点本身
                 
                 # 检查特征窗口是否有足够数据
                 if feature_start_idx > feature_end_idx:
                     print(f"  警告: {stage_name} 特征窗口数据不足，跳过\n")
                     continue
                 
-                # 提取特征计算用数据
-                feature_data = df.loc[feature_start_idx:feature_end_idx].copy()
+                # 从均线数据中提取特征计算用数据
+                feature_data = df_stage.loc[feature_start_idx:feature_end_idx].copy()
                 print(f"  特征计算窗口: 索引 {feature_start_idx} 至 {feature_end_idx} ({len(feature_data)}条数据)")
                 
                 # 提取该stage的实际数据（从首个出现位置开始）
-                stage_mask = (df['stage'] == stage)
-                # group_data 仅包含stage=N的数据
-                group_data = df[stage_mask].copy()
+                stage_mask = (df_stage['stage'] == stage)
+                group_stage_data = df_stage[stage_mask].copy()
 
                 # 取group_data的第一条数据和最后一条数据的日期
-                start_date = group_data['timestamps'].iloc[0]
-                end_date = group_data['timestamps'].iloc[-1]
+                start_date = group_stage_data['timestamps'].iloc[0]
+                end_date = group_stage_data['timestamps'].iloc[-1]
+                
+                # 从均线数据中提取对应时间段的数据
+                group_ma_data = df_stage[
+                    (df_stage['timestamps'] >= start_date) & 
+                    (df_stage['timestamps'] <= end_date)
+                ].copy()
 
-                duration_days = len(group_data)
+                duration_days = len(group_ma_data)
                 
                 # 判断周期类型
                 duration_type = 'long' if duration_days > DURATION_THRESHOLDS[stage_name] else 'short'
                 print(f"  周期类型: {duration_type} ({duration_days}天)")
-                
-                # 提取特征（使用首个stage数据点之前的60条数据）
-                features = extract_stage_features(feature_data, ma_periods)
                 
                 # 获取模型路径
                 model_path = MODEL_PATHS[stage_name][duration_type]['model_path']
@@ -346,14 +391,14 @@ def get_stage_class_from_csv0919(ma_periods=[4, 8, 12, 16, 20, 47]):
                     print(f"  警告: {stage_name} {duration_type}模型文件不存在: {model_path}，跳过该阶段\n")
                     continue
                 
-                # 创建临时文件保存特征数据
-                # 拼接feature_data和group_data用于预测
-                combined_data = pd.concat([feature_data, group_data], ignore_index=True)
+                # 创建临时文件保存特征数据（使用均线数据）
+                combined_data = pd.concat([feature_data, group_ma_data], ignore_index=True)
                 with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', encoding='utf-8') as temp_file:
                     combined_data.to_csv(temp_file, index=False)
                     temp_file_path = temp_file.name
                 
                 # 根据阶段选择对应的预测模型
+                probabilities = None
                 try:
                     if stage == 1:
                         probabilities = predict_stage1(
@@ -377,53 +422,53 @@ def get_stage_class_from_csv0919(ma_periods=[4, 8, 12, 16, 20, 47]):
                     # 无论预测是否成功，都删除临时文件
                     os.unlink(temp_file_path)
                 
-                # 存储结果
-                stage_results[stage_name][duration_type].append({
-                    'start_date': start_date.strftime('%Y-%m-%d'),
-                    'end_date': end_date.strftime('%Y-%m-%d'),
-                    'duration_days': duration_days,
-                    'features': features.tolist(),
-                    'probabilities': probabilities,
-                    'model_used': os.path.basename(model_path),
-                    'feature_window': f"{feature_start_idx}-{feature_end_idx}"
+                # 处理概率结果，解决数组转换问题
+                formatted_probabilities = {}
+                if probabilities is not None:
+                    try:
+                        # 处理numpy数组情况
+                        if hasattr(probabilities, 'ndim'):
+                            # 如果是二维数组，取第一行
+                            if probabilities.ndim == 2 and probabilities.shape[0] > 0:
+                                probabilities = probabilities[0]
+                            # 展平为一维数组
+                            probabilities = probabilities.flatten()
+                        
+                        # 处理列表嵌套情况
+                        while isinstance(probabilities, (list, np.ndarray)) and len(probabilities) == 1:
+                            probabilities = probabilities[0]
+                        
+                        print(probabilities)
+                        # 提取概率数组（第二个元素的第一行）
+                        probabilities = probabilities[1][0]  # 结果是 numpy 数组：array([0.54, 0.45, 0.01, 0.  ])
+                        # 确保是一维序列
+                        if isinstance(probabilities, (list, np.ndarray)) and len(probabilities) > 0:
+                            formatted_probabilities = {
+                                f"class{i+1}": float(prob) for i, prob in enumerate(probabilities)
+                            }
+                        else:
+                            print(f"  警告: 概率数据不是有效的序列: {probabilities}")
+                            formatted_probabilities = {"error": "invalid_probability_format"}
+                    except Exception as e:
+                        print(f"  处理概率时出错: {str(e)}")
+                        formatted_probabilities = {"error": str(e)}
+                
+                # 添加当前stage的详细结果（只要包含类别预测概率即可）
+                detailed_results.append({
+                    'stock_code': stock_code,
+                    'recent_ma_data': recent_ma_list,
+                    'detected_stage': stage,
+                    'prediction_results': formatted_probabilities  # 确保包含类别预测概率
                 })
             
-            # 保存结果
-            result_file = os.path.join(result_folder, f"{stock_code}_stage_based_results.csv")
-            save_stage_based_results(stock_code, stage_results, result_file)
-            
-            # 收集汇总信息
-            all_results.append({
-                'stock_code': stock_code,
-                'stage1_long': len(stage_results['stage1']['long']),
-                'stage1_short': len(stage_results['stage1']['short']),
-                'stage2_long': len(stage_results['stage2']['long']),
-                'stage2_short': len(stage_results['stage2']['short']),
-                'stage3_long': len(stage_results['stage3']['long']),
-                'stage3_short': len(stage_results['stage3']['short']),
-            })
-            
-            print(f"  处理完成，结果已保存至: {result_file}\n")
+            print(f"  处理完成\n")
+
             
         except Exception as e:
             print(f"  处理出错: {str(e)}\n")
             continue
+    return detailed_results
     
-    # 打印汇总结果
-    print("\n===== 测试汇总结果 =====")
-    print(f"总处理文件数: {len(csv_files)}")
-    print(f"成功处理文件数: {len(all_results)}\n")
-    
-    for result in all_results:
-        print(f"股票代码: {result['stock_code']}")
-        print(f"stage1: 长周期={result['stage1_long']}, 短周期={result['stage1_short']}")
-        print(f"stage2: 长周期={result['stage2_long']}, 短周期={result['stage2_short']}")
-        print(f"stage3: 长周期={result['stage3_long']}, 短周期={result['stage3_short']}")
-        print("---")
-
-    return all_results, stage_results
-
-
 def main():
     # 配置测试参数
     data_folder = r"D:\self\code\tool_ma_back\bbb_fragments"  # 包含stage标记的CSV文件目录

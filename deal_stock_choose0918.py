@@ -6,6 +6,7 @@ import shutil
 from deal_stock_choose0919 import get_stage_class_from_csv0919
 
 def load_stock_data(stock_code: str, data_folder: str = "D:\\self\\data\\final_data_0821") -> pd.DataFrame:
+
     """加载股票数据从指定目录的CSV文件"""
     file_path = os.path.join(data_folder, f"{stock_code}.csv")
     try:
@@ -245,7 +246,7 @@ def export_stage_data(stock_code: str, df: pd.DataFrame, fragment: Dict, target_
     mask = (combined_data.index.date >= start_date) & (combined_data.index.date <= end_date)
     combined_data.loc[mask, 'stage'] = stage_value
     
-    output_path = os.path.join(target_folder, f"{stock_code}_with_stage.csv")
+    output_path = os.path.join(target_folder, f"{stock_code['code']}_with_stage.csv")
     combined_data.reset_index().to_csv(output_path, index=False)
     print(f"已导出带阶段标记的数据到: {output_path}")
 
@@ -253,12 +254,14 @@ def analyze_stock(stock_code: str, n_days: int, min_fragment_length: int = 5,
                  data_folder: str = "D:\\self\\data\\final_data_0821", stage1_lookback: int = 60,
                  target_folder: str = "D:\\self\\stage_data") -> Dict:
     """分析单只股票，查找近N天内的阶段片段"""
+    print("执行：分析单只股票，查找近N天内的阶段片段，并导出csv文件")
     print(f"\n开始分析股票: {stock_code}")
-    df = load_stock_data(stock_code, data_folder)
+
+    df = load_stock_data(stock_code['code'], data_folder)
     if df is None or len(df) == 0:
         return None
     
-    print(f"股票 {stock_code} 数据量: {len(df)} 条，检查近 {n_days} 天")
+    print(f"股票 {stock_code['code']} 数据量: {len(df)} 条，检查近 {n_days} 天")
     print(f"数据日期范围: {df.index.min().date()} 至 {df.index.max().date()}")
     
     # 先查找stage2片段（优先检测）
@@ -285,7 +288,7 @@ def analyze_stock(stock_code: str, n_days: int, min_fragment_length: int = 5,
     # 如果有有效的stage2结果，直接返回
     if valid_fragments:
         latest_fragment = get_latest_fragment(valid_fragments)
-        print(f"股票 {stock_code} 找到最新的stage2片段 ({latest_fragment['end_date']})")
+        print(f"股票 {stock_code} 找到最新的stage2片段 ({latest_fragment['end_date']})，并导出到csv文件---------------")
         export_stage_data(stock_code, df, latest_fragment, target_folder)
         return {
             "stock_code": stock_code,
@@ -320,7 +323,7 @@ def analyze_stock(stock_code: str, n_days: int, min_fragment_length: int = 5,
         return None
     
     latest_fragment = get_latest_fragment(stage1_results)
-    print(f"股票 {stock_code} 找到最新的stage1片段 ({latest_fragment['end_date']})")
+    print(f"股票 {stock_code} 找到最新的stage1片段 ({latest_fragment['end_date']})，并导出到csv文件---------------")
     export_stage_data(stock_code, df, latest_fragment, target_folder)
     
     return {
@@ -332,6 +335,7 @@ def analyze_stock_pool(stock_codes: List[str], n_days: int, min_fragment_length:
                       data_folder: str = "D:\\self\\data\\final_data_0821", stage1_lookback: int = 60,
                       target_folder: str = "D:\\self\\stage_data") -> List[Dict]:
     """分析股票池，返回所有找到阶段片段的股票结果"""
+    print("执行analyze_stock_pool")
     results = []
     for code in stock_codes:
         stock_result = analyze_stock(
@@ -346,13 +350,17 @@ def analyze_stock_pool(stock_codes: List[str], n_days: int, min_fragment_length:
 def find_N_days_bullish_0919(stock_pool: List[str], n_days: int, ma_periods: List[str], min_fragment_length: int = 5, 
                             stage1_lookback: int = 60, target_folder: str = "D:\\self\\stage_data") -> List[Dict]:
     """处理前端请求，返回分析结果"""
-    analyze_stock_pool(stock_pool, n_days, min_fragment_length, 
+    print("执行find_N_days_bullish_0919")
+    result = analyze_stock_pool(stock_pool, n_days, min_fragment_length, 
                              data_folder="D:\\self\\data\\final_data_0821", 
                              stage1_lookback=stage1_lookback,
                              target_folder=target_folder)
-    print("ori_result----------",result)
-    all_results, stage_results = get_stage_class_from_csv0919(ma_periods=ma_periods)
-    return all_results, stage_results
+    print(len(result))
+
+    all_results = get_stage_class_from_csv0919(ma_periods=ma_periods, recent_days=n_days)
+    # print(all_results)
+    print(type(all_results))
+    return all_results
 
 
 if __name__ == "__main__":

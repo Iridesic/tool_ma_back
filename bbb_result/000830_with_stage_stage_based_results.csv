@@ -1,2 +1,0 @@
-﻿stock_code,stage,duration_type,start_date,end_date,duration_days,features,probabilities,model_used,feature_window
-000830_with_stage,stage2,long,2025-03-17,2025-03-25,7,"[nan, nan, nan, nan, nan, nan, 0.0025235849056601937, -0.003469387755101894, -0.004814814814814857, -0.002692073170731737, 0.14923784194528864]","(array([1]), array([[0.05, 0.94, 0.  , 0.01]]))",stage2_long_model.pkl,0-59

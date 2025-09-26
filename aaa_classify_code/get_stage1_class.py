@@ -38,6 +38,8 @@ def predict_from_csv(csv_file_path, model_path, training_feature_path, history_d
         
         if 'timestamps' not in current_df.columns:
             raise ValueError("CSV文件中缺少'timestamps'列")
+        
+        print(current_df.head)
             
         stage1_df = current_df[current_df['stage'] == 1].copy()
         if stage1_df.empty:
